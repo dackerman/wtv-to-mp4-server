@@ -1,0 +1,27 @@
+doctype html
+html
+    head
+        meta(charset='utf-8')
+        title Movie Server
+        link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+    body
+        include header
+        div(class='container')
+            if !jobs.length
+                h2 Current Jobs
+                table(class='table table-striped')
+                    thead
+                        tr
+                            th Job Name
+                            th Output File
+                            th Progress
+                    tbody
+                        each job in jobs
+                            tr
+                                td
+                                    a(href='jobs/#{job.jobID}') #{job.name}
+                                td #{job.outputPath}
+                                td #{job.progress} (#{job.status})
+
+            h2 Create a new Job
+            a(href='/browse') Browse the filesystem

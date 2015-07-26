@@ -1,0 +1,22 @@
+doctype html
+html
+    head
+        meta(charset='utf-8')
+        title Details for #{job.name}
+        link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+    body
+        include header
+        div(class='container')
+            h1 Job "#{job.name}"
+            h3 Progress: #{job.progress} (#{job.status})
+            h3 Output File: #{job.outputPath}
+            h3 Input Files:
+            for inputFile in job.inputPaths
+                p #{inputFile}
+            h3 Job Logs
+            code
+                for jobLog in jobLogs
+                    p Log
+                    for line in jobLog
+                        #{line}
+                    br

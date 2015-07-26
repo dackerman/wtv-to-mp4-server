@@ -1,0 +1,9 @@
+/.idea
+/build
+/.gradle
+/logs
+*.iml
+job-database
+job-database.p
+job-database.t
+Thumbs.db

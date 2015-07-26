@@ -1,0 +1,30 @@
+doctype html
+html
+    head
+        meta(charset='utf-8')
+        title Movie Server Listings
+        link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+    body
+        include header
+        div(class='container')
+            h1 Browse Filesystem
+            h2 Create a new Job
+            p Browsing
+                code #{directory}
+            form(method='POST', action='/create-job')
+                each listing in listings
+                    if listing.isDirectory
+                        p
+                            a(href=listing.url)
+                                code #{listing.name}/
+                    else
+                        div(class='checkbox')
+                            label
+                                input(name="inputFiles", value=listing.path, type='checkbox')
+                                code #{listing.name}
+                div(class='form-group')
+                    label(for='jobName') Job Name
+                    input(name='name', type='text', required='true', class='form-control', id='jobName', placeholder='My Job')
+                    label(for='output') Output File
+                    input(name='output', type='text', required='true', class='form-control', id='output', placeholder='Wimbledon Finals')
+                button(type='submit', class='btn btn-default') Create Job
