@@ -5,7 +5,7 @@ html
         title Details for #{job.name}
         link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
     body
-        include header
+        include navbar
         div(class='container')
             h1 Job "#{job.name}"
             h3 Progress: #{job.progress} (#{job.status.name})

@@ -147,7 +147,7 @@ public class MovieServer {
         return "/browse/" + Joiner.on("|").join(path.split("\\\\"));
     }
 
-    private static class FrontendFile {
+    public static class FrontendFile {
         public final String url;
         public final String path;
         public final String name;

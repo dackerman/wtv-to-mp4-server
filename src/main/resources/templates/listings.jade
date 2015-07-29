@@ -4,24 +4,32 @@ html
         meta(charset='utf-8')
         title Movie Server Listings
         link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+        script(src='https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js')
     body
-        include header
+        include navbar
         div(class='container')
-            h1 Browse Filesystem
-            h2 Create a new Job
-            p Browsing
+            h1 Create a new Job
+            h3 Browsing
                 code #{directory}
+            table(class='table table-striped table-bordered')
+                thead
+                    tr
+                        th File
+                        th
+                tbody
+                    each listing in listings
+                        tr
+                            if listing.isDirectory
+                                td
+                                    a(href=listing.url)
+                                        code #{listing.name}/
+                                td
+                            else
+                                td #{listing.name}
+                                td
+                                    if listing.isWtv
+                                        button(class='btn btn-default listing-button', data-value=listing.path) Add
             form(method='POST', action='/create-job')
-                each listing in listings
-                    if listing.isDirectory
-                        p
-                            a(href=listing.url)
-                                code #{listing.name}/
-                    else
-                        div(class='checkbox')
-                            label
-                                input(name="inputFiles", value=listing.path, type='checkbox', disabled=!listing.isWtv)
-                                code #{listing.name}
                 div(class='form-group')
                     label(for='jobName') Job Name
                     input(type='hidden', name='directory', value=directory)
