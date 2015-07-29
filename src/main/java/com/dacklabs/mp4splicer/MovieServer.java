@@ -1,5 +1,8 @@
 package com.dacklabs.mp4splicer;
 
+import com.dacklabs.mp4splicer.model.EncodingStats;
+import com.dacklabs.mp4splicer.model.Job;
+import com.dacklabs.mp4splicer.model.JobStatus;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -43,8 +46,8 @@ public class MovieServer {
 
         Database db = new Database("job-database");
 
-        for (Database.Job job : db.jobs()) {
-            if (!job.status.equals(Database.JobStatus.DONE)) {
+        for (Job job : db.jobs()) {
+            if (!job.status.equals(JobStatus.DONE)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
                 executor.execute(new ConvertToMP4Worker(db, job.jobID, tempDir.getAbsolutePath()));
             }
@@ -59,10 +62,15 @@ public class MovieServer {
 
         Spark.get("/jobs/:jobId", (req, res) -> {
             String jobId = req.params("jobId");
-            Database.Job job = db.getJob(jobId);
+            Job job = db.getJob(jobId);
+            List<List<EncodingStats>> inputStats = new ArrayList<>();
+            for (int i = 0; i < job.inputPaths.size(); i++) {
+                inputStats.add(db.getInputStats(jobId, i));
+            }
+
             Map<String, Object> map = new HashMap<>();
             map.put("job", job);
-            map.put("jobLogs", db.getLogs(jobId));
+            map.put("inputStats", inputStats);
             return new ModelAndView(map, "job");
         }, templateEngine);
 
@@ -72,19 +80,16 @@ public class MovieServer {
             String url = req.params("url");
             String path = toPath(url);
             File file = new File(path);
-            List<Map<String, Object>> directoryFiles = new ArrayList<>();
+            List<FrontendFile> directoryFiles = new ArrayList<>();
             if (file.isDirectory() && file.canRead()) {
                 File[] files = file.listFiles();
                 directoryFiles = Arrays.asList(files).stream()
                         .sorted((f1, f2) -> Boolean.compare(f2.isDirectory(), f1.isDirectory()))
-                        .filter(f -> f.isDirectory() || f.getName().endsWith(".wtv"))
                         .map(MovieServer::frontendFile)
                         .collect(Collectors.toList());
                 File parent = file.getParentFile();
                 if (parent != null && parent.exists()) {
-                    Map<String, Object> parentObj = frontendFile(parent);
-                    parentObj.put("name", "..");
-                    directoryFiles.add(0, parentObj);
+                    directoryFiles.add(0, frontendFile(parent, ".."));
                 }
             } else {
                 throw new RuntimeException("Couldn't read directory " + file.getAbsolutePath());
@@ -98,12 +103,13 @@ public class MovieServer {
         Spark.post("/create-job", (req, res) -> {
             QueryParamsMap jobDetails = req.queryMap();
             String name = Preconditions.checkNotNull(jobDetails.get("name").value(), "job name cannot be null");
-            String outputFile = Preconditions.checkNotNull(jobDetails.get("output").value(),
-                                                           "output file name cannot be null");
+            String outputFile = Preconditions.checkNotNull(jobDetails.get("output").value(), "output file name cannot be null");
+            String directory = Preconditions.checkNotNull(jobDetails.get("directory").value(), "Base directory cannot be null");
             String[] inputFiles = jobDetails.get("inputFiles").values();
+
             Preconditions.checkArgument(inputFiles.length > 1, "Must have at least two inputs");
             String jobId = UUID.randomUUID().toString();
-            Database.Job job = new Database.Job(jobId, name, outputFile, Arrays.asList(inputFiles));
+            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles));
             db.saveJob(job);
             executor.execute(new ConvertToMP4Worker(db, job.jobID, tempPath));
 
@@ -120,13 +126,17 @@ public class MovieServer {
         });
     }
 
-    private static Map<String, Object> frontendFile(File f) {
-        Map<String, Object> folder = new HashMap<>();
-        folder.put("url", fromPath(f.getAbsolutePath()));
-        folder.put("path", f.getAbsolutePath());
-        folder.put("isDirectory", f.isDirectory());
-        folder.put("name", f.getName());
-        return folder;
+    private static FrontendFile frontendFile(File f) {
+        return frontendFile(f, null);
+    }
+
+    private static FrontendFile frontendFile(File f, String alternateName) {
+        String url = fromPath(f.getAbsolutePath());
+        String path = f.getAbsolutePath();
+        String name = alternateName != null ? alternateName : f.getName();
+        boolean isDirectory = f.isDirectory();
+        boolean isWtv = f.getName().endsWith(".wtv");
+        return new FrontendFile(url, path, name, isDirectory, isWtv);
     }
 
     private static String toPath(String url) {
@@ -137,13 +147,19 @@ public class MovieServer {
         return "/browse/" + Joiner.on("|").join(path.split("\\\\"));
     }
 
-    private static class BrowseFolder {
+    private static class FrontendFile {
         public final String url;
+        public final String path;
         public final String name;
+        public final boolean isDirectory;
+        public final boolean isWtv;
 
-        private BrowseFolder(String absolutePath, String name) {
-            this.url = fromPath(absolutePath);
+        private FrontendFile(String url, String path, String name, boolean isDirectory, boolean isWtv) {
+            this.url = url;
+            this.path = path;
             this.name = name;
+            this.isDirectory = isDirectory;
+            this.isWtv = isWtv;
         }
     }
 }

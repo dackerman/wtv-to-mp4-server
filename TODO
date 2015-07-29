@@ -1,0 +1,8 @@
+Better Job Status information
+  * For each converting file, show bytes/sec, estimated time left, etc (tail log file)
+  * For concatenation, do the same
+  * Show log files in separate URLs instead of all on one page
+
+Allow for ordering of videos for correct concatenation
+
+Allow for selecting a time slice for each file

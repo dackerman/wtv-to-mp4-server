@@ -20,10 +20,11 @@ html
                     else
                         div(class='checkbox')
                             label
-                                input(name="inputFiles", value=listing.path, type='checkbox')
+                                input(name="inputFiles", value=listing.path, type='checkbox', disabled=!listing.isWtv)
                                 code #{listing.name}
                 div(class='form-group')
                     label(for='jobName') Job Name
+                    input(type='hidden', name='directory', value=directory)
                     input(name='name', type='text', required='true', class='form-control', id='jobName', placeholder='My Job')
                     label(for='output') Output File
                     input(name='output', type='text', required='true', class='form-control', id='output', placeholder='Wimbledon Finals')

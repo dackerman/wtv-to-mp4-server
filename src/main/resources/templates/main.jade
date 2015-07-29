@@ -21,7 +21,7 @@ html
                                 td
                                     a(href='jobs/#{job.jobID}') #{job.name}
                                 td #{job.outputPath}
-                                td #{job.progress} (#{job.status})
+                                td #{job.progress} (#{job.status.name})
 
             h2 Create a new Job
             a(href='/browse') Browse the filesystem

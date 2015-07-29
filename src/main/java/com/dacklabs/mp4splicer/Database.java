@@ -1,72 +1,25 @@
 package com.dacklabs.mp4splicer;
 
+import com.dacklabs.mp4splicer.model.*;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/**
- * Created by david on 7/25/2015.
- */
 public class Database {
 
     private final DB db;
-
-    public enum JobStatus {
-        WAITING("Waiting to be picked up"),
-        STARTED("Started"),
-        CONVERTING_TO_TS("Converting to TS format"),
-        CONCATENATING("Concatenating"),
-        DONE("Completed");
-
-        private final String name;
-
-        JobStatus(String name) {
-            this.name = name;
-        }
-    }
-
-    public static class Job {
-        public final String jobID;
-        public final String name;
-        public final String outputPath;
-        public final Double progress;
-        public final JobStatus status;
-        public final List<String> inputPaths;
-
-        public Job(String jobId, String name, String outputPath, List<String> inputPaths) {
-            this(jobId, name, outputPath, 0.0, JobStatus.WAITING, inputPaths);
-        }
-
-        public Job(String jobId, String name, String outputPath, Double progress, JobStatus status, List<String> inputPaths) {
-            this.jobID = jobId;
-            this.name = name;
-            this.outputPath = outputPath;
-            this.progress = progress;
-            this.status = status;
-            this.inputPaths = Collections.unmodifiableList(inputPaths);
-        }
-
-        public Job start() {
-            return new Job(jobID, name, outputPath, 1.0, JobStatus.STARTED, inputPaths);
-        }
-
-        public Job concatenating() {
-            return new Job(jobID, name, outputPath, 60.0, JobStatus.CONCATENATING, inputPaths);
-        }
-
-        public Job done() {
-            return new Job(jobID, name, outputPath, 100.0, JobStatus.DONE, inputPaths);
-        }
-    }
 
     public Database(String databasePath) {
         db = DBMaker.newFileDB(new File(databasePath)).make();
@@ -96,13 +49,42 @@ public class Database {
         bos.write(log.getBytes());
     }
 
+    public List<EncodingStats> getInputStats(String jobId, int i) {
+        return getStatsFromLog(conversionErrorsLogFile(jobId, i));
+    }
+
+    private List<EncodingStats> getStatsFromLog(Path logFile) {
+        List<EncodingStats> stats = new ArrayList<>();
+        Pattern statsPattern = Pattern.compile(
+                ".*frame=\\s*(?<frame>\\d+) fps=\\s*(?<fps>[\\d.]+).*size=\\s*(?<size>\\d+kB) time=(?<time>.*) " +
+                        "bitrate=(?<bitrate>.*) dup.* drop=(?<dropped>\\d+).*");
+        try {
+            for (String line : Files.readAllLines(logFile, Charset.forName("UTF-8"))) {
+                Matcher matcher = statsPattern.matcher(line);
+
+                if (!matcher.matches()) continue;
+
+                int frame = Integer.parseInt(matcher.group("frame"));
+                double fps = Double.parseDouble(matcher.group("fps"));
+                String sizeinKb = matcher.group("size");
+                String estimatedTimeLeft = matcher.group("time");
+                String bitrate = matcher.group("bitrate");
+                int droppedFrames = Integer.parseInt(matcher.group("dropped"));
+                stats.add(new EncodingStats(frame, fps, sizeinKb, estimatedTimeLeft, bitrate, droppedFrames));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return stats;
+    }
+
     public List<List<String>> getLogs(String jobId) {
         Job job = getJob(jobId);
         List<List<String>> logs = new ArrayList<>();
         try {
             for (int i = 0; i < job.inputPaths.size(); i++) {
-                logs.add(Files.readAllLines(Paths.get("logs/convert-" + jobId + "-" + i + "-errors.txt")));
-                logs.add(Files.readAllLines(Paths.get("logs/convert-" + jobId + "-" + i + "-output.txt")));
+                logs.add(Files.readAllLines(conversionErrorsLogFile(jobId, i)));
+                logs.add(Files.readAllLines(conversionOutputLogFile(jobId, i)));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -111,34 +93,66 @@ public class Database {
         return logs;
     }
 
+    private Path conversionOutputLogFile(String jobId, int i) {
+        return Paths.get("logs/convert-" + jobId + "-" + i + "-output.txt");
+    }
+
+    private Path conversionErrorsLogFile(String jobId, int i) {
+        return Paths.get("logs/convert-" + jobId + "-" + i + "-errors.txt");
+    }
+
     private static class JobSerializer implements Serializable, Serializer<Job> {
 
         @Override
         public void serialize(DataOutput out, Job job) throws IOException {
             out.writeUTF(job.jobID);
             out.writeUTF(job.name);
-            out.writeUTF(job.outputPath);
-            out.writeDouble(job.progress);
-            out.writeUTF(job.status.toString());
+            out.writeUTF(job.directory);
+            writeFFMPEGFile(out, job.outputPath);
+            out.writeUTF(job.status.name());
             out.writeInt(job.inputPaths.size());
-            for (String inputPath : job.inputPaths) {
-                out.writeUTF(inputPath);
+            for (FFMPEGFile inputPath : job.inputPaths) {
+                writeFFMPEGFile(out, inputPath);
             }
+        }
+
+        private void writeFFMPEGFile(DataOutput out, FFMPEGFile f) throws IOException {
+            out.writeUTF(f.path);
+            out.writeUTF(f.encodingStatus.name());
+            out.writeInt(f.stats.frame);
+            out.writeDouble(f.stats.fps);
+            out.writeUTF(f.stats.sizeInKb);
+            out.writeUTF(f.stats.estimatedTimeLeft);
+            out.writeUTF(f.stats.bitrate);
+            out.writeInt(f.stats.droppedFrames);
         }
 
         @Override
         public Job deserialize(DataInput in, int available) throws IOException {
             String jobID = in.readUTF();
             String name = in.readUTF();
-            String outputPath = in.readUTF();
-            Double progress = in.readDouble();
+            String directory = in.readUTF();
+            FFMPEGFile outputPath = readFFMPEGFile(in);
             JobStatus status = JobStatus.valueOf(in.readUTF());
             int numInputs = in.readInt();
-            List<String> inputPaths = new ArrayList<>();
+            List<FFMPEGFile> inputPaths = new ArrayList<>();
             for (int i = 0; i < numInputs; i++) {
-                inputPaths.add(in.readUTF());
+                inputPaths.add(readFFMPEGFile(in));
             }
-            return new Job(jobID, name, outputPath, progress, status, inputPaths);
+            return new Job(jobID, name, directory, outputPath, status, inputPaths);
+        }
+
+        private FFMPEGFile readFFMPEGFile(DataInput in) throws IOException {
+            String path = in.readUTF();
+            EncodingStatus encodingStatus = EncodingStatus.valueOf(in.readUTF());
+            int frame = in.readInt();
+            double fps = in.readDouble();
+            String sizeInKb = in.readUTF();
+            String estimatedTimeLeft = in.readUTF();
+            String bitrate = in.readUTF();
+            int droppedFrames = in.readInt();
+
+            return new FFMPEGFile(path, encodingStatus, new EncodingStats(frame, fps, sizeInKb, estimatedTimeLeft, bitrate, droppedFrames));
         }
 
         @Override

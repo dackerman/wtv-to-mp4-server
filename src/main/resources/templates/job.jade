@@ -8,15 +8,16 @@ html
         include header
         div(class='container')
             h1 Job "#{job.name}"
-            h3 Progress: #{job.progress} (#{job.status})
+            h3 Progress: #{job.progress} (#{job.status.name})
             h3 Output File: #{job.outputPath}
             h3 Input Files:
-            for inputFile in job.inputPaths
-                p #{inputFile}
-            h3 Job Logs
-            code
-                for jobLog in jobLogs
-                    p Log
-                    for line in jobLog
-                        #{line}
-                    br
+            for inputFile,i in job.inputPaths
+                h4 #{inputFile.path}
+                for stat in inputStats[i]
+                    p
+                        span frame: #{stat.frame}
+                        span fps: #{stat.fps}
+                        span sizeInKb: #{stat.sizeInKb}
+                        span time: #{stat.estimatedTimeLeft}
+                        span bitrate: #{stat.bitrate}
+                        span dropped frames: #{stat.droppedFrames}
