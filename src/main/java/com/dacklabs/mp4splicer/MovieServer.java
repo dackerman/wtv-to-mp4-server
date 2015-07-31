@@ -10,9 +10,9 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MultimapBuilder;
 import spark.*;
-import spark.template.jade.JadeTemplateEngine;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -20,10 +20,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class MovieServer {
-    public static void main(String[] argsArray) {
+    public static void main(String[] argsArray) throws IOException {
+        System.out.println("Starting");
         Iterator<String> args = Lists.newArrayList(argsArray).iterator();
         boolean debug = false;
         File tempDir = null;
+        int port = 4567;
+        String ffmpeg = null;
         while (args.hasNext()) {
             String flag = args.next();
             switch (flag) {
@@ -34,11 +37,19 @@ public class MovieServer {
                     Preconditions.checkArgument(args.hasNext(), "Need to specify tmpDir");
                     tempDir = new File(args.next());
                     break;
+                case "-port":
+                    Preconditions.checkArgument(args.hasNext(), "Need to specify -port <theport>");
+                    port = Integer.valueOf(args.next());
+                case "-ffmpeg":
+                    Preconditions.checkArgument(args.hasNext(), "Need to specify ffmpeg path after -ffmpeg");
+                    ffmpeg = args.next();
             }
         }
+        final String ffmpegPath = ffmpeg;
         Preconditions.checkNotNull(tempDir, "Specify a location to put intermediate files with -tmpDir");
+        Preconditions.checkNotNull(ffmpegPath, "Specify the path to the ffmpeg executable with -ffmpeg");
         String tempPath = tempDir.getAbsolutePath();
-        TemplateEngine templateEngine = new JadeTemplateEngine();
+        TemplateEngine templateEngine = new DackJadeTemplateEngine();
         if (debug) {
             System.out.println("Debugging");
             templateEngine = new ExternalJadeTemplateEngine();
@@ -54,11 +65,13 @@ public class MovieServer {
         for (Job job : db.jobs()) {
             if (!job.status.equals(JobStatus.DONE) && !job.status.equals(JobStatus.CANCELED)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
-                executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath()));
+                executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(),
+                                                        ffmpegPath));
             }
         }
+        Spark.port(port);
 
-        Spark.externalStaticFileLocation("R:/Projects/mp4-splicer/src/main/resources");
+        System.out.println("Setting up routes");
         Spark.get("/", (req, res) -> {
             Map<String, Object> map = new HashMap<>();
             map.put("jobs", db.jobs());
@@ -128,11 +141,13 @@ public class MovieServer {
             String jobId = UUID.randomUUID().toString();
             Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles));
             db.saveJob(job);
-            executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempPath));
+            executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempPath, ffmpegPath));
 
             res.redirect("/");
             return null;
         });
+
+        System.out.println("Done setting up routes");
 
         Spark.exception(RuntimeException.class, new ExceptionHandler() {
             @Override

@@ -21,12 +21,15 @@ public class ConvertToMP4Worker implements Runnable {
     private final String jobId;
     private final String tempLocation;
     private final ListMultimap<String, Process> runningProcesses;
+    private final String ffmpeg;
 
-    ConvertToMP4Worker(Database db, ListMultimap<String, Process> runningProcesses, String jobId, String tempLocation) {
+    ConvertToMP4Worker(Database db, ListMultimap<String, Process> runningProcesses, String jobId, String tempLocation,
+                       String ffmpeg) {
         this.db = db;
         this.jobId = jobId;
         this.tempLocation = tempLocation;
         this.runningProcesses = runningProcesses;
+        this.ffmpeg = ffmpeg;
     }
 
     @Override
@@ -44,7 +47,7 @@ public class ConvertToMP4Worker implements Runnable {
                 String tmpPath = tempLocation + "/" + inputFile.getName() + ".tmp.mp4";
                 tmpPaths.add(tmpPath);
                 List<String> command =
-                        Lists.newArrayList("ffmpeg", "-y", "-i", input.path, "-vcodec", "copy", "-acodec", "copy",
+                        Lists.newArrayList(ffmpeg, "-y", "-i", input.path, "-vcodec", "copy", "-acodec", "copy",
                                            "-target", "ntsc-dvd", tmpPath);
                 System.out.println("Executing: " + Joiner.on(" ").join(command));
 
@@ -67,7 +70,7 @@ public class ConvertToMP4Worker implements Runnable {
             job = db.saveJob(job.concatenating());
             FFMPEGFile output = job.outputPath;
             List<String> command = new ArrayList<>();
-            command.add("ffmpeg");
+            command.add(ffmpeg);
             command.add("-y");
             command.add("-i");
             command.add("\"concat:" + Joiner.on("|").join(tmpPaths) + "\"");
