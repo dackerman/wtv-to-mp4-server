@@ -8,16 +8,50 @@ html
         include navbar
         div(class='container')
             h1 Job "#{job.name}"
-            h3 Progress: #{job.progress} (#{job.status.name})
-            h3 Output File: #{job.outputPath}
+                if job.status != 'CANCELED'
+                    a(href='/jobs/#{job.jobID}/cancel',class='btn btn-danger pull-right') Cancel
+            table(class='table table-striped')
+                thead
+                    tr
+                        th Status
+                        th Elapsed Time
+                        th % Complete
+                tbody
+                    tr
+                        td #{job.status.name}
+                        td #{job.elapsedTimeInSeconds()}s
+                        td #{job.percentComplete()}%
+            table(class='table table-striped')
+                thead
+                    tr
+                        th Output File
+                        th Encoding Status
+                        th Time Left
+                        th Bitrate
+                        th FPS
+                tbody
+                    tr
+                        td
+                            code #{job.outputPath.path}
+                        td #{job.outputPath.encodingStatus}
+                        td #{outputStats.estimatedTimeLeft}
+                        td #{outputStats.bitrate}
+                        td #{outputStats.fps}
             h3 Input Files:
-            for inputFile,i in job.inputPaths
-                h4 #{inputFile.path}
-                for stat in inputStats[i]
-                    p
-                        span frame: #{stat.frame}
-                        span fps: #{stat.fps}
-                        span sizeInKb: #{stat.sizeInKb}
-                        span time: #{stat.estimatedTimeLeft}
-                        span bitrate: #{stat.bitrate}
-                        span dropped frames: #{stat.droppedFrames}
+            table(class='table table-striped')
+                thead
+                    tr
+                        th Input File
+                        th Encoding Status
+                        th Time Left
+                        th Bitrate
+                        th FPS
+                tbody
+                for inputFile,i in job.inputPaths
+                    tr
+                        td
+                            code #{inputFile.path}
+                        td #{inputFile.encodingStatus}
+                        td #{inputStats[i].estimatedTimeLeft}
+                        td #{inputStats[i].bitrate}
+                        td #{inputStats[i].fps}

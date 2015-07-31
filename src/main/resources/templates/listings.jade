@@ -5,6 +5,45 @@ html
         title Movie Server Listings
         link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
         script(src='https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js')
+        script
+            $(document).ready(function(){
+                var inputs = [];
+
+                function reDrawInputs() {
+                    $('#inputs').empty();
+                    inputs.forEach(function(i){
+                        $('#inputs').append(makeInput(i));
+                    });
+                    $('.listing-button').each(function() {
+                        var path = $(this).data('value');
+                        if (inputs.indexOf(path) > -1) {
+                            $(this).prop('disabled', true);
+                        } else {
+                            $(this).prop('disabled', false);
+                        }
+                    })
+                }
+
+                function makeInput(path) {
+                    var input = $('<div class="form-group"><input class="selected-input" type="checkbox" checked name="inputFiles" value="'+path+'">'+path+'</div>');
+                    input.find(".selected-input").click(clickHandlerFor(path));
+                    return input;
+                }
+
+                $('.listing-button').click(function(){
+                    var path = $(this).data('value');
+                    inputs.push(path);
+                    reDrawInputs();
+                });
+
+                function clickHandlerFor(path){
+                    return function() {
+                        var idx = inputs.indexOf(path);
+                        inputs.splice(idx,1);
+                        reDrawInputs();
+                    };
+                };
+            });
     body
         include navbar
         div(class='container')
@@ -30,10 +69,13 @@ html
                                     if listing.isWtv
                                         button(class='btn btn-default listing-button', data-value=listing.path) Add
             form(method='POST', action='/create-job')
+                input(type='hidden', name='directory', value=directory)
                 div(class='form-group')
                     label(for='jobName') Job Name
-                    input(type='hidden', name='directory', value=directory)
                     input(name='name', type='text', required='true', class='form-control', id='jobName', placeholder='My Job')
+                div(class='form-group')
                     label(for='output') Output File
                     input(name='output', type='text', required='true', class='form-control', id='output', placeholder='Wimbledon Finals')
+                div(id='inputs')
+                    label Videos to encode and concatenate, in order
                 button(type='submit', class='btn btn-default') Create Job

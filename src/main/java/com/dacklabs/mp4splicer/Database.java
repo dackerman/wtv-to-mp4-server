@@ -9,8 +9,11 @@ import org.mapdb.Serializer;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,14 +46,12 @@ public class Database {
         return job;
     }
 
-    public void appendLogs(String jobId, String log) throws IOException {
-        BufferedOutputStream bos =
-                new BufferedOutputStream(new FileOutputStream("logs/" + jobId, true));
-        bos.write(log.getBytes());
+    public List<EncodingStats> getConcatStats(Job job) {
+        return getStatsFromLog(Paths.get(job.concatErrorsLogFile()));
     }
 
-    public List<EncodingStats> getInputStats(String jobId, int i) {
-        return getStatsFromLog(conversionErrorsLogFile(jobId, i));
+    public List<EncodingStats> getInputStats(Job job, int i) {
+        return getStatsFromLog(Paths.get(job.inputConversionErrorsLogFile(i)));
     }
 
     private List<EncodingStats> getStatsFromLog(Path logFile) {
@@ -72,33 +73,12 @@ public class Database {
                 int droppedFrames = Integer.parseInt(matcher.group("dropped"));
                 stats.add(new EncodingStats(frame, fps, sizeinKb, estimatedTimeLeft, bitrate, droppedFrames));
             }
+        } catch(NoSuchFileException nsfe){
+            // do nothing, this is normal
         } catch (IOException e) {
             e.printStackTrace();
         }
         return stats;
-    }
-
-    public List<List<String>> getLogs(String jobId) {
-        Job job = getJob(jobId);
-        List<List<String>> logs = new ArrayList<>();
-        try {
-            for (int i = 0; i < job.inputPaths.size(); i++) {
-                logs.add(Files.readAllLines(conversionErrorsLogFile(jobId, i)));
-                logs.add(Files.readAllLines(conversionOutputLogFile(jobId, i)));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return logs;
-    }
-
-    private Path conversionOutputLogFile(String jobId, int i) {
-        return Paths.get("logs/convert-" + jobId + "-" + i + "-output.txt");
-    }
-
-    private Path conversionErrorsLogFile(String jobId, int i) {
-        return Paths.get("logs/convert-" + jobId + "-" + i + "-errors.txt");
     }
 
     private static class JobSerializer implements Serializable, Serializer<Job> {
@@ -107,6 +87,7 @@ public class Database {
         public void serialize(DataOutput out, Job job) throws IOException {
             out.writeUTF(job.jobID);
             out.writeUTF(job.name);
+            out.writeUTF(job.createDate.format(DateTimeFormatter.ISO_DATE_TIME));
             out.writeUTF(job.directory);
             writeFFMPEGFile(out, job.outputPath);
             out.writeUTF(job.status.name());
@@ -119,18 +100,13 @@ public class Database {
         private void writeFFMPEGFile(DataOutput out, FFMPEGFile f) throws IOException {
             out.writeUTF(f.path);
             out.writeUTF(f.encodingStatus.name());
-            out.writeInt(f.stats.frame);
-            out.writeDouble(f.stats.fps);
-            out.writeUTF(f.stats.sizeInKb);
-            out.writeUTF(f.stats.estimatedTimeLeft);
-            out.writeUTF(f.stats.bitrate);
-            out.writeInt(f.stats.droppedFrames);
         }
 
         @Override
         public Job deserialize(DataInput in, int available) throws IOException {
             String jobID = in.readUTF();
             String name = in.readUTF();
+            LocalDateTime createDate = LocalDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(in.readUTF()));
             String directory = in.readUTF();
             FFMPEGFile outputPath = readFFMPEGFile(in);
             JobStatus status = JobStatus.valueOf(in.readUTF());
@@ -139,20 +115,14 @@ public class Database {
             for (int i = 0; i < numInputs; i++) {
                 inputPaths.add(readFFMPEGFile(in));
             }
-            return new Job(jobID, name, directory, outputPath, status, inputPaths);
+            return new Job(jobID, createDate, name, directory, outputPath, status, inputPaths);
         }
 
         private FFMPEGFile readFFMPEGFile(DataInput in) throws IOException {
             String path = in.readUTF();
             EncodingStatus encodingStatus = EncodingStatus.valueOf(in.readUTF());
-            int frame = in.readInt();
-            double fps = in.readDouble();
-            String sizeInKb = in.readUTF();
-            String estimatedTimeLeft = in.readUTF();
-            String bitrate = in.readUTF();
-            int droppedFrames = in.readInt();
 
-            return new FFMPEGFile(path, encodingStatus, new EncodingStats(frame, fps, sizeInKb, estimatedTimeLeft, bitrate, droppedFrames));
+            return new FFMPEGFile(path, encodingStatus);
         }
 
         @Override

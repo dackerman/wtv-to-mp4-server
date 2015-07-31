@@ -5,7 +5,10 @@ import com.dacklabs.mp4splicer.model.Job;
 import com.dacklabs.mp4splicer.model.JobStatus;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.MultimapBuilder;
 import spark.*;
 import spark.template.jade.JadeTemplateEngine;
 
@@ -44,12 +47,14 @@ public class MovieServer {
         ThreadPoolExecutor executor =
                 new ThreadPoolExecutor(1, 5, 60, TimeUnit.SECONDS, new LinkedBlockingDeque<>());
 
+        ListMultimap<String, Process> runningProcesses = MultimapBuilder.hashKeys().arrayListValues().build();
+
         Database db = new Database("job-database");
 
         for (Job job : db.jobs()) {
-            if (!job.status.equals(JobStatus.DONE)) {
+            if (!job.status.equals(JobStatus.DONE) && !job.status.equals(JobStatus.CANCELED)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
-                executor.execute(new ConvertToMP4Worker(db, job.jobID, tempDir.getAbsolutePath()));
+                executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath()));
             }
         }
 
@@ -63,16 +68,28 @@ public class MovieServer {
         Spark.get("/jobs/:jobId", (req, res) -> {
             String jobId = req.params("jobId");
             Job job = db.getJob(jobId);
-            List<List<EncodingStats>> inputStats = new ArrayList<>();
+            List<EncodingStats> inputStats = new ArrayList<>();
             for (int i = 0; i < job.inputPaths.size(); i++) {
-                inputStats.add(db.getInputStats(jobId, i));
+                inputStats.add(Iterables.getLast(db.getInputStats(job, i), EncodingStats.none()));
             }
 
             Map<String, Object> map = new HashMap<>();
             map.put("job", job);
             map.put("inputStats", inputStats);
+            map.put("outputStats", Iterables.getLast(db.getConcatStats(job), EncodingStats.none()));
             return new ModelAndView(map, "job");
         }, templateEngine);
+
+        Spark.get("/jobs/:jobId/cancel", (req, res) -> {
+            String jobID = req.params("jobId");
+            Job job = db.saveJob(db.getJob(jobID).cancel());
+            for (Process process : runningProcesses.get(job.jobID)) {
+                process.destroyForcibly();
+            }
+
+            res.redirect("/jobs/" + jobID);
+            return "";
+        });
 
         Spark.get("/browse", (req, res) -> {res.redirect("/browse/||CENTERCOURT|videotest"); return null;});
 
@@ -111,7 +128,7 @@ public class MovieServer {
             String jobId = UUID.randomUUID().toString();
             Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles));
             db.saveJob(job);
-            executor.execute(new ConvertToMP4Worker(db, job.jobID, tempPath));
+            executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempPath));
 
             res.redirect("/");
             return null;
