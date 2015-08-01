@@ -19,7 +19,7 @@ html
                 tbody
                     tr
                         td #{job.status.name}
-                        td #{job.elapsedTimeInSeconds()}s
+                        td #{job.formattedElapsedTime()}
                         td #{job.percentComplete()}%
             table(class='table table-striped')
                 thead

@@ -1,4 +1,4 @@
-package com.dacklabs.mp4splicer;
+package com.dacklabs.mp4splicer.templateengines;
 
 import com.google.common.io.Resources;
 import de.neuland.jade4j.JadeConfiguration;
@@ -12,10 +12,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Map;
 
-/**
- * Created by david on 7/31/2015.
- */
-public class DackJadeTemplateEngine extends TemplateEngine {
+public class ResourcesJadeTemplateEngine extends TemplateEngine {
 
     private JadeConfiguration configuration;
 
@@ -23,7 +20,7 @@ public class DackJadeTemplateEngine extends TemplateEngine {
      * Construct a jade template engine defaulting to the 'templates' directory
      * under the resource path.
      */
-    public DackJadeTemplateEngine() {
+    public ResourcesJadeTemplateEngine() {
         this("templates");
     }
 
@@ -32,7 +29,7 @@ public class DackJadeTemplateEngine extends TemplateEngine {
      *
      * @param templateRoot the template root directory to use
      */
-    public DackJadeTemplateEngine(String templateRoot) {
+    public ResourcesJadeTemplateEngine(String templateRoot) {
         configuration = new JadeConfiguration();
         configuration.setTemplateLoader(new DackTemplateLoader(templateRoot));
     }

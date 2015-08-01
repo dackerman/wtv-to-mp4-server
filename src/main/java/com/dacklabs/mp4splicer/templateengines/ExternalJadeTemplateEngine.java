@@ -1,4 +1,4 @@
-package com.dacklabs.mp4splicer;
+package com.dacklabs.mp4splicer.templateengines;
 
 import de.neuland.jade4j.JadeConfiguration;
 import de.neuland.jade4j.template.FileTemplateLoader;
@@ -9,9 +9,6 @@ import spark.TemplateEngine;
 import java.io.IOException;
 import java.util.Map;
 
-/**
- * Created by david on 7/25/2015.
- */
 public class ExternalJadeTemplateEngine extends TemplateEngine {
 
     private JadeConfiguration configuration;

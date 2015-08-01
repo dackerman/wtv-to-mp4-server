@@ -3,6 +3,8 @@ package com.dacklabs.mp4splicer;
 import com.dacklabs.mp4splicer.model.EncodingStats;
 import com.dacklabs.mp4splicer.model.Job;
 import com.dacklabs.mp4splicer.model.JobStatus;
+import com.dacklabs.mp4splicer.templateengines.ExternalJadeTemplateEngine;
+import com.dacklabs.mp4splicer.templateengines.ResourcesJadeTemplateEngine;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -13,6 +15,8 @@ import spark.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -49,7 +53,7 @@ public class MovieServer {
         Preconditions.checkNotNull(tempDir, "Specify a location to put intermediate files with -tmpDir");
         Preconditions.checkNotNull(ffmpegPath, "Specify the path to the ffmpeg executable with -ffmpeg");
         String tempPath = tempDir.getAbsolutePath();
-        TemplateEngine templateEngine = new DackJadeTemplateEngine();
+        TemplateEngine templateEngine = new ResourcesJadeTemplateEngine();
         if (debug) {
             System.out.println("Debugging");
             templateEngine = new ExternalJadeTemplateEngine();
@@ -65,11 +69,13 @@ public class MovieServer {
         for (Job job : db.jobs()) {
             if (!job.status.equals(JobStatus.DONE) && !job.status.equals(JobStatus.CANCELED)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
-                executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(),
+                executor.execute(new FFMpegConcatWorker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(),
                                                         ffmpegPath));
             }
         }
         Spark.port(port);
+
+        Spark.staticFileLocation("public");
 
         System.out.println("Setting up routes");
         Spark.get("/", (req, res) -> {
@@ -136,12 +142,14 @@ public class MovieServer {
             String outputFile = Preconditions.checkNotNull(jobDetails.get("output").value(), "output file name cannot be null");
             String directory = Preconditions.checkNotNull(jobDetails.get("directory").value(), "Base directory cannot be null");
             String[] inputFiles = jobDetails.get("inputFiles").values();
+            Integer startTrim = getTrim("startTrim", jobDetails);
+            Integer endTrim = getTrim("endTrim", jobDetails);
 
             Preconditions.checkArgument(inputFiles.length > 1, "Must have at least two inputs");
             String jobId = UUID.randomUUID().toString();
-            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles));
+            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim);
             db.saveJob(job);
-            executor.execute(new ConvertToMP4Worker(db, runningProcesses, job.jobID, tempPath, ffmpegPath));
+            executor.execute(new FFMpegConcatWorker(db, runningProcesses, job.jobID, tempPath, ffmpegPath));
 
             res.redirect("/");
             return null;
@@ -156,6 +164,24 @@ public class MovieServer {
                 response.body(exception.getMessage());
             }
         });
+    }
+
+    private static Integer getTrim(String name, QueryParamsMap queryParamsMap) {
+        Integer hours = parseNullableInt(queryParamsMap.get(name + "Hours").value());
+        Integer minutes = parseNullableInt(queryParamsMap.get(name + "Minutes").value());
+        Integer seconds = parseNullableInt(queryParamsMap.get(name + "Seconds").value());
+        Long amount = Duration.of(hours != null ? hours.longValue() : 0, ChronoUnit.HOURS)
+                .plusMinutes(minutes != null ? minutes.longValue() : 0)
+                .plusSeconds(seconds != null ? seconds.longValue() : 0)
+                .getSeconds();
+        return amount == 0 ? null : amount.intValue();
+    }
+
+    private static Integer parseNullableInt(String val) {
+        if (val == null || val.trim().isEmpty()) {
+            return null;
+        }
+        return Integer.parseInt(val.trim());
     }
 
     private static FrontendFile frontendFile(File f) {
