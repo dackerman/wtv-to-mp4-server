@@ -1,5 +1,6 @@
-package com.dacklabs.mp4splicer;
+package com.dacklabs.mp4splicer.workers;
 
+import com.dacklabs.mp4splicer.Database;
 import com.dacklabs.mp4splicer.model.EncodingStatus;
 import com.dacklabs.mp4splicer.model.FFMPEGFile;
 import com.dacklabs.mp4splicer.model.Job;
@@ -47,8 +48,7 @@ public class ConvertToMP4Worker implements Runnable {
                 String tmpPath = tempLocation + "/" + inputFile.getName() + ".tmp.mp4";
                 tmpPaths.add(tmpPath);
                 List<String> command =
-                        Lists.newArrayList(ffmpeg, "-y", "-i", input.path, "-vcodec", "copy", "-acodec", "copy",
-                                           "-target", "ntsc-dvd", tmpPath);
+                        Lists.newArrayList(ffmpeg, "-y", "-i", input.path, "-preset", "ultrafast", "-qp", "0", "-t", "20", "-vcodec", "copy", "-acodec", "copy", tmpPath);
                 System.out.println("Executing: " + Joiner.on(" ").join(command));
 
                 job = db.saveJob(job.updateInputStatus(inputIndex, EncodingStatus.ENCODING));
@@ -76,6 +76,14 @@ public class ConvertToMP4Worker implements Runnable {
             command.add("\"concat:" + Joiner.on("|").join(tmpPaths) + "\"");
             command.add("-c");
             command.add("copy");
+            if (job.startTrimTimeSeconds != null) {
+                command.add("-ss");
+                command.add(job.startTrimTimeSeconds.toString());
+            }
+            if (job.endTrimTimeSeconds != null) {
+                command.add("-sseof");
+                command.add("-" + job.endTrimTimeSeconds);
+            }
             Path tempOutput = Paths.get(tempLocation, output.path);
             command.add("\"" + tempOutput + "\"");
 

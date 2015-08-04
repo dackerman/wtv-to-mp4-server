@@ -58,7 +58,7 @@ public class Database {
         List<EncodingStats> stats = new ArrayList<>();
         Pattern statsPattern = Pattern.compile(
                 ".*frame=\\s*(?<frame>\\d+) fps=\\s*(?<fps>[\\d.]+).*size=\\s*(?<size>\\d+kB) time=(?<time>.*) " +
-                        "bitrate=(?<bitrate>.*) dup.* drop=(?<dropped>\\d+).*");
+                        "bitrate=(?<bitrate>[^ ]*).*");
         try {
             for (String line : Files.readAllLines(logFile, Charset.forName("UTF-8"))) {
                 Matcher matcher = statsPattern.matcher(line);
@@ -70,8 +70,7 @@ public class Database {
                 String sizeinKb = matcher.group("size");
                 String estimatedTimeLeft = matcher.group("time");
                 String bitrate = matcher.group("bitrate");
-                int droppedFrames = Integer.parseInt(matcher.group("dropped"));
-                stats.add(new EncodingStats(frame, fps, sizeinKb, estimatedTimeLeft, bitrate, droppedFrames));
+                stats.add(new EncodingStats(frame, fps, sizeinKb, estimatedTimeLeft, bitrate, 0));
             }
         } catch(NoSuchFileException nsfe){
             // do nothing, this is normal
@@ -104,6 +103,7 @@ public class Database {
             for (FFMPEGFile inputPath : job.inputPaths) {
                 writeFFMPEGFile(out, inputPath);
             }
+            out.writeBoolean(job.goFast);
         }
 
         @Override
@@ -127,9 +127,10 @@ public class Database {
             for (int i = 0; i < numInputs; i++) {
                 inputPaths.add(readFFMPEGFile(in));
             }
+            boolean goFast = in.readBoolean();
             return new Job(jobID, createDate, endDate, name, directory, outputPath, status, inputPaths,
                            startTrim != Integer.MIN_VALUE ? startTrim : null,
-                           endTrim != Integer.MIN_VALUE ? endTrim : null);
+                           endTrim != Integer.MIN_VALUE ? endTrim : null, goFast);
         }
 
         private String serializeDate(LocalDateTime date) {

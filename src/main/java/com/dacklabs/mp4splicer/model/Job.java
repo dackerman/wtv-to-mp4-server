@@ -21,17 +21,19 @@ public class Job {
     public final List<FFMPEGFile> inputPaths;
     public final LocalDateTime createDate;
     public final LocalDateTime endDate;
+    public final boolean goFast;
 
-    public static Job create(String jobId, String name, String directory, String outputPath, List<String> inputPaths, Integer startTrimTimeSeconds, Integer endTrimTimeSeconds) {
+    public static Job create(String jobId, String name, String directory, String outputPath, List<String> inputPaths,
+                             Integer startTrimTimeSeconds, Integer endTrimTimeSeconds, boolean goFast) {
         if (!outputPath.endsWith(".mp4")) {
             outputPath += ".mp4";
         }
         LocalDateTime createDate = LocalDateTime.now();
-        return new Job(jobId, createDate, null, name, directory, FFMPEGFile.create(outputPath), JobStatus.CREATED, Lists.transform(inputPaths, FFMPEGFile::create), startTrimTimeSeconds, endTrimTimeSeconds);
+        return new Job(jobId, createDate, null, name, directory, FFMPEGFile.create(outputPath), JobStatus.CREATED, Lists.transform(inputPaths, FFMPEGFile::create), startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }
 
     public Job(String jobId, LocalDateTime createDate, LocalDateTime endDate, String name, String directory, FFMPEGFile outputPath, JobStatus status, List<FFMPEGFile> inputPaths,
-               Integer startTrimTimeSeconds, Integer endTrimTimeSeconds) {
+               Integer startTrimTimeSeconds, Integer endTrimTimeSeconds, boolean goFast) {
         this.jobID = jobId;
         this.name = name;
         this.directory = directory;
@@ -42,6 +44,7 @@ public class Job {
         this.endDate = endDate;
         this.startTrimTimeSeconds = startTrimTimeSeconds;
         this.endTrimTimeSeconds = endTrimTimeSeconds;
+        this.goFast = goFast;
     }
 
     public String formattedElapsedTime() {
@@ -150,6 +153,6 @@ public class Job {
 
     private Job updateJob(LocalDateTime endDate, FFMPEGFile outputPath, JobStatus status, List<FFMPEGFile> inputPaths) {
         return new Job(jobID, createDate, endDate, name, directory, outputPath, status, inputPaths,
-                       startTrimTimeSeconds, endTrimTimeSeconds);
+                       startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }
 }

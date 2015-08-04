@@ -4,6 +4,8 @@ import com.dacklabs.mp4splicer.model.EncodingStats;
 import com.dacklabs.mp4splicer.model.Job;
 import com.dacklabs.mp4splicer.model.JobStatus;
 import com.dacklabs.mp4splicer.templateengines.ExternalJadeTemplateEngine;
+import com.dacklabs.mp4splicer.workers.FFMpegConcatWorker;
+import com.dacklabs.mp4splicer.workers.FFMpegFilterGraphWorker;
 import com.dacklabs.mp4splicer.templateengines.ResourcesJadeTemplateEngine;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -25,10 +27,9 @@ import java.util.stream.Collectors;
 
 public class MovieServer {
     public static void main(String[] argsArray) throws IOException {
-        System.out.println("Starting");
         Iterator<String> args = Lists.newArrayList(argsArray).iterator();
         boolean debug = false;
-        File tempDir = null;
+        String tempDirPath = null;
         int port = 4567;
         String ffmpeg = null;
         while (args.hasNext()) {
@@ -39,7 +40,7 @@ public class MovieServer {
                     break;
                 case "-tmpDir":
                     Preconditions.checkArgument(args.hasNext(), "Need to specify tmpDir");
-                    tempDir = new File(args.next());
+                    tempDirPath = args.next();
                     break;
                 case "-port":
                     Preconditions.checkArgument(args.hasNext(), "Need to specify -port <theport>");
@@ -50,9 +51,9 @@ public class MovieServer {
             }
         }
         final String ffmpegPath = ffmpeg;
-        Preconditions.checkNotNull(tempDir, "Specify a location to put intermediate files with -tmpDir");
+        Preconditions.checkNotNull(tempDirPath, "Specify a location to put intermediate files with -tmpDir");
         Preconditions.checkNotNull(ffmpegPath, "Specify the path to the ffmpeg executable with -ffmpeg");
-        String tempPath = tempDir.getAbsolutePath();
+        final File tempDir = new File(tempDirPath);
         TemplateEngine templateEngine = new ResourcesJadeTemplateEngine();
         if (debug) {
             System.out.println("Debugging");
@@ -69,15 +70,13 @@ public class MovieServer {
         for (Job job : db.jobs()) {
             if (!job.status.equals(JobStatus.DONE) && !job.status.equals(JobStatus.CANCELED)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
-                executor.execute(new FFMpegConcatWorker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(),
-                                                        ffmpegPath));
+                executor.execute(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
             }
         }
         Spark.port(port);
 
         Spark.staticFileLocation("public");
 
-        System.out.println("Setting up routes");
         Spark.get("/", (req, res) -> {
             Map<String, Object> map = new HashMap<>();
             map.put("jobs", db.jobs());
@@ -141,21 +140,20 @@ public class MovieServer {
             String name = Preconditions.checkNotNull(jobDetails.get("name").value(), "job name cannot be null");
             String outputFile = Preconditions.checkNotNull(jobDetails.get("output").value(), "output file name cannot be null");
             String directory = Preconditions.checkNotNull(jobDetails.get("directory").value(), "Base directory cannot be null");
+            boolean goFast = jobDetails.get("fast").value() != null;
             String[] inputFiles = jobDetails.get("inputFiles").values();
             Integer startTrim = getTrim("startTrim", jobDetails);
             Integer endTrim = getTrim("endTrim", jobDetails);
 
             Preconditions.checkArgument(inputFiles.length > 1, "Must have at least two inputs");
             String jobId = UUID.randomUUID().toString();
-            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim);
+            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim, goFast);
             db.saveJob(job);
-            executor.execute(new FFMpegConcatWorker(db, runningProcesses, job.jobID, tempPath, ffmpegPath));
+            executor.execute(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
 
             res.redirect("/");
             return null;
         });
-
-        System.out.println("Done setting up routes");
 
         Spark.exception(RuntimeException.class, new ExceptionHandler() {
             @Override
@@ -164,6 +162,15 @@ public class MovieServer {
                 response.body(exception.getMessage());
             }
         });
+    }
+
+    private static Runnable createWorker(File tempDir, String ffmpegPath, ListMultimap<String, Process> runningProcesses,
+                                         Database db, Job job) {
+        if (job.goFast) {
+            return new FFMpegConcatWorker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(), ffmpegPath);
+        } else {
+            return new FFMpegFilterGraphWorker(db, runningProcesses, job.jobID, tempDir.getAbsolutePath(), ffmpegPath);
+        }
     }
 
     private static Integer getTrim(String name, QueryParamsMap queryParamsMap) {

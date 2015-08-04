@@ -1,5 +1,6 @@
-package com.dacklabs.mp4splicer;
+package com.dacklabs.mp4splicer.workers;
 
+import com.dacklabs.mp4splicer.Database;
 import com.dacklabs.mp4splicer.model.EncodingStatus;
 import com.dacklabs.mp4splicer.model.FFMPEGFile;
 import com.dacklabs.mp4splicer.model.Job;
@@ -75,10 +76,14 @@ public class FFMpegConcatWorker implements Runnable {
         command.add("-y");
         command.add("-f");
         command.add("concat");
+        command.add("-fflags");
+        command.add("+genpts");
         command.add("-i");
         command.add(inputFilesConfig.toString());
         command.add("-c");
         command.add("copy");
+        command.add("-t");
+        command.add("20");
         if (job.startTrimTimeSeconds != null) {
             command.add("-ss");
             command.add(job.startTrimTimeSeconds.toString());

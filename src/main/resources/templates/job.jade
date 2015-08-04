@@ -38,20 +38,31 @@ html
                         td #{outputStats.bitrate}
                         td #{outputStats.fps}
             h3 Input Files:
-            table(class='table table-striped')
-                thead
-                    tr
-                        th Input File
-                        th Encoding Status
-                        th Time Left
-                        th Bitrate
-                        th FPS
-                tbody
-                for inputFile,i in job.inputPaths
-                    tr
-                        td
-                            code #{inputFile.path}
-                        td #{inputFile.encodingStatus}
-                        td #{inputStats[i].estimatedTimeLeft}
-                        td #{inputStats[i].bitrate}
-                        td #{inputStats[i].fps}
+            if job.goFast
+                table(class='table table-striped')
+                    thead
+                        tr
+                            th Input File
+                    tbody
+                    for inputFile,i in job.inputPaths
+                        tr
+                            td
+                                code #{inputFile.path}
+            else
+                table(class='table table-striped')
+                    thead
+                        tr
+                            th Input File
+                            th Encoding Status
+                            th Time Left
+                            th Bitrate
+                            th FPS
+                    tbody
+                    for inputFile,i in job.inputPaths
+                        tr
+                            td
+                                code #{inputFile.path}
+                            td #{inputFile.encodingStatus}
+                            td #{inputStats[i].estimatedTimeLeft}
+                            td #{inputStats[i].bitrate}
+                            td #{inputStats[i].fps}
