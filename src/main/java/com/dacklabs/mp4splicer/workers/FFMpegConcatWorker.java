@@ -42,7 +42,7 @@ public class FFMpegConcatWorker implements Runnable {
             job = db.saveJob(job.resetTimer());
 
             for (InputFile inputFile : job.inputPaths) {
-                job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
+                job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(ffmpeg, inputFile.path)));
             }
             db.saveJob(job);
 

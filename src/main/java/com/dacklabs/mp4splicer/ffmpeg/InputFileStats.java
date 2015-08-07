@@ -53,8 +53,8 @@ public class InputFileStats {
         return fps.multiply(new BigDecimal(Duration.of(duration, ChronoUnit.NANOS).getSeconds())).longValue();
     }
 
-    public static InputFileStats probeStats(String inputFile) throws IOException, InterruptedException {
-        ProcessBuilder ffmpegBuilder = new ProcessBuilder().command("ffmpeg", "-i", inputFile);
+    public static InputFileStats probeStats(String ffmpegPath, String inputFile) throws IOException, InterruptedException {
+        ProcessBuilder ffmpegBuilder = new ProcessBuilder().command(ffmpegPath, "-i", "\"" + inputFile + "\"");
         Process ffmpeg = ffmpegBuilder.start();
         Scanner s = new Scanner(ffmpeg.getErrorStream());
 
