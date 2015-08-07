@@ -1,8 +1,8 @@
 package com.dacklabs.mp4splicer.model;
 
-/**
-* Created by david on 7/28/2015.
-*/
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class EncodingStats {
     public final int frame;
     public final double fps;
@@ -11,8 +11,13 @@ public class EncodingStats {
     public final String bitrate;
     public final int droppedFrames;
 
-    public EncodingStats(int frame, double fps, String sizeInKb, String estimatedTimeLeft, String bitrate,
-                         int droppedFrames) {
+    @JsonCreator
+    public EncodingStats(@JsonProperty("frame") int frame,
+                         @JsonProperty("fps") double fps,
+                         @JsonProperty("sizeInKb") String sizeInKb,
+                         @JsonProperty("estimatedTimeLeft") String estimatedTimeLeft,
+                         @JsonProperty("bitrate") String bitrate,
+                         @JsonProperty("droppedFrames") int droppedFrames) {
         this.frame = frame;
         this.fps = fps;
         this.sizeInKb = sizeInKb;

@@ -1,9 +1,12 @@
 package com.dacklabs.mp4splicer.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -18,7 +21,7 @@ public class Job {
     public final Integer startTrimTimeSeconds;
     public final Integer endTrimTimeSeconds;
     public final JobStatus status;
-    public final List<FFMPEGFile> inputPaths;
+    public final List<InputFile> inputPaths;
     public final LocalDateTime createDate;
     public final LocalDateTime endDate;
     public final boolean goFast;
@@ -29,11 +32,21 @@ public class Job {
             outputPath += ".mp4";
         }
         LocalDateTime createDate = LocalDateTime.now();
-        return new Job(jobId, createDate, null, name, directory, FFMPEGFile.create(outputPath), JobStatus.CREATED, Lists.transform(inputPaths, FFMPEGFile::create), startTrimTimeSeconds, endTrimTimeSeconds, goFast);
+        return new Job(jobId, createDate, null, name, directory, FFMPEGFile.create(outputPath), JobStatus.CREATED, Lists.transform(inputPaths, InputFile::create), startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }
 
-    public Job(String jobId, LocalDateTime createDate, LocalDateTime endDate, String name, String directory, FFMPEGFile outputPath, JobStatus status, List<FFMPEGFile> inputPaths,
-               Integer startTrimTimeSeconds, Integer endTrimTimeSeconds, boolean goFast) {
+    @JsonCreator
+    public Job(@JsonProperty("jobID") String jobId,
+               @JsonProperty("createDate") LocalDateTime createDate,
+               @JsonProperty("endDate") LocalDateTime endDate,
+               @JsonProperty("name") String name,
+               @JsonProperty("directory") String directory,
+               @JsonProperty("outputPath") FFMPEGFile outputPath,
+               @JsonProperty("status") JobStatus status,
+               @JsonProperty("inputPaths") List<InputFile> inputPaths,
+               @JsonProperty("startTrimTimeSeconds") Integer startTrimTimeSeconds,
+               @JsonProperty("endTrimTimeSeconds") Integer endTrimTimeSeconds,
+               @JsonProperty("goFast") boolean goFast) {
         this.jobID = jobId;
         this.name = name;
         this.directory = directory;
@@ -73,25 +86,15 @@ public class Job {
         return Joiner.on(", ").join(units);
     }
 
-    public double percentComplete() {
-        switch (status) {
-            case CREATED:
-                return 0;
-            case ENCODING:
-                double avgInputPercent = 0;
-                for (FFMPEGFile inputPath : inputPaths) {
-                    avgInputPercent += inputPath.percentComplete();
-                }
-                avgInputPercent /= inputPaths.size();
-                return rangeBetween(avgInputPercent, 5, 70); // range: 5% - 70%
-            case CONCATENATING:
-                return rangeBetween(outputPath.percentComplete(), 70, 95); // range: 33% - 66
-            case COPYING_OUTPUT:
-                return 95;
-            case DONE:
-                return 100.0;
-        }
-        return -1;
+    public double percentComplete(EncodingStats currentOutputStats) {
+        long totalFrames = inputPaths.stream().map(i -> i.stats.totalFrames()).reduce(0L, (a,b) -> a + b);
+
+        int frame = currentOutputStats.frame;
+        totalFrames = Math.max(totalFrames, 1); // avoid div by zero
+        return new BigDecimal(frame).setScale(5, BigDecimal.ROUND_UNNECESSARY)
+                                                      .divide(new BigDecimal(totalFrames), BigDecimal.ROUND_HALF_UP)
+                                                      .movePointRight(2)
+                                                      .doubleValue();
     }
 
     public String concatErrorsLogFile() {
@@ -103,13 +106,13 @@ public class Job {
     }
 
     public String inputConversionErrorsLogFile(int index) {
-        FFMPEGFile input = inputPaths.get(index);
+        InputFile input = inputPaths.get(index);
         String inputName = Iterables.getLast(Lists.newArrayList(input.path.split("[\\\\/]")));
         return String.format("logs/job-%s-%s-%s-%s-convert-stderr.log", jobID, name, inputName, index);
     }
 
     public String inputConversionOutputLogFile(int index) {
-        FFMPEGFile input = inputPaths.get(index);
+        InputFile input = inputPaths.get(index);
         String inputName = Iterables.getLast(Lists.newArrayList(input.path.split("[\\\\/]")));
         return String.format("logs/job-%s-%s-%s-%s-convert-stdout.log", jobID, name, inputName, index);
     }
@@ -119,12 +122,9 @@ public class Job {
         return value * (diff / 100.0) + lowPercent;
     }
 
-    public Job updateInputStatus(int inputIndex, EncodingStatus encoding) {
-        FFMPEGFile inputFile = inputPaths.get(inputIndex).transitionTo(encoding);
-        return updateJob(endDate, outputPath, status, Lists.transform(inputPaths, i -> {
-            if (inputFile.path.equals(i.path)) return inputFile;
-            return i;
-        }));
+    public Job updateInput(InputFile newInput) {
+        return updateJob(endDate, outputPath, status,
+                         Lists.transform(inputPaths, i -> newInput.path.equals(i.path) ? newInput : i));
     }
 
     public Job updateOutputStatus(EncodingStatus newStatus) {
@@ -151,7 +151,7 @@ public class Job {
         return updateJob(endDate, outputPath, JobStatus.CANCELED, inputPaths);
     }
 
-    private Job updateJob(LocalDateTime endDate, FFMPEGFile outputPath, JobStatus status, List<FFMPEGFile> inputPaths) {
+    private Job updateJob(LocalDateTime endDate, FFMPEGFile outputPath, JobStatus status, List<InputFile> inputPaths) {
         return new Job(jobID, createDate, endDate, name, directory, outputPath, status, inputPaths,
                        startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }

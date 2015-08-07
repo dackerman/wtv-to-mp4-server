@@ -1,8 +1,9 @@
 package com.dacklabs.mp4splicer.workers;
 
 import com.dacklabs.mp4splicer.Database;
+import com.dacklabs.mp4splicer.ffmpeg.InputFileStats;
 import com.dacklabs.mp4splicer.model.EncodingStatus;
-import com.dacklabs.mp4splicer.model.FFMPEGFile;
+import com.dacklabs.mp4splicer.model.InputFile;
 import com.dacklabs.mp4splicer.model.Job;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ListMultimap;
@@ -36,6 +37,11 @@ public class FFMpegFilterGraphWorker implements Runnable {
         try {
             Job job = db.getJob(jobId);
 
+            for (InputFile inputFile : job.inputPaths) {
+                job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
+            }
+            db.saveJob(job);
+
             List<String> command = generateFFMpegCommand(job);
 
             System.out.println("Executing: " + Joiner.on(" ").join(command));
@@ -60,7 +66,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
         List<String> command = new ArrayList<>();
         command.add(ffmpeg);
         command.add("-y");
-        for (FFMPEGFile inputPath : job.inputPaths) {
+        for (InputFile inputPath : job.inputPaths) {
             command.add("-i");
             command.add("\"" + inputPath.path + "\"");
         }

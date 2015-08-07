@@ -1,8 +1,9 @@
 package com.dacklabs.mp4splicer.workers;
 
 import com.dacklabs.mp4splicer.Database;
+import com.dacklabs.mp4splicer.ffmpeg.InputFileStats;
 import com.dacklabs.mp4splicer.model.EncodingStatus;
-import com.dacklabs.mp4splicer.model.FFMPEGFile;
+import com.dacklabs.mp4splicer.model.InputFile;
 import com.dacklabs.mp4splicer.model.Job;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
@@ -24,7 +25,7 @@ public class FFMpegConcatWorker implements Runnable {
     private final ListMultimap<String, Process> runningProcesses;
     private final String ffmpeg;
 
-    FFMpegConcatWorker(Database db, ListMultimap<String, Process> runningProcesses, String jobId, String tempLocation,
+    public FFMpegConcatWorker(Database db, ListMultimap<String, Process> runningProcesses, String jobId, String tempLocation,
                        String ffmpeg) {
         this.db = db;
         this.jobId = jobId;
@@ -37,6 +38,11 @@ public class FFMpegConcatWorker implements Runnable {
     public void run() {
         try {
             Job job = db.getJob(jobId);
+
+            for (InputFile inputFile : job.inputPaths) {
+                job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
+            }
+            db.saveJob(job);
 
             Path inputFilesConfigPath = writeFFMpegConfigFile(job);
 
@@ -61,7 +67,7 @@ public class FFMpegConcatWorker implements Runnable {
     }
 
     private Path writeFFMpegConfigFile(Job job) throws IOException {List<String> configLines = new ArrayList<>();
-        for (FFMPEGFile inputPath : job.inputPaths) {
+        for (InputFile inputPath : job.inputPaths) {
             configLines.add("file " + inputPath.path.replace("\\", "/").replace(" ", "\\ "));
         }
 

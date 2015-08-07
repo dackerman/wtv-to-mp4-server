@@ -1,6 +1,10 @@
 package com.dacklabs.mp4splicer;
 
-import com.dacklabs.mp4splicer.model.*;
+import com.dacklabs.mp4splicer.model.EncodingStats;
+import com.dacklabs.mp4splicer.model.Job;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.guava.GuavaModule;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
@@ -12,8 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -82,75 +84,20 @@ public class Database {
 
     private static class JobSerializer implements Serializable, Serializer<Job> {
 
-        private static final int VERSION = 1;
+        private static final ObjectMapper om = new ObjectMapper();
+        static {
+            om.registerModule(new JSR310Module());
+            om.registerModule(new GuavaModule());
+        }
 
         @Override
         public void serialize(DataOutput out, Job job) throws IOException {
-            out.writeInt(VERSION);
-            out.writeUTF(job.jobID);
-            out.writeUTF(job.name);
-            out.writeInt(job.startTrimTimeSeconds != null ? job.startTrimTimeSeconds : Integer.MIN_VALUE);
-            out.writeInt(job.endTrimTimeSeconds != null ? job.endTrimTimeSeconds : Integer.MIN_VALUE);
-            out.writeUTF(serializeDate(job.createDate));
-            out.writeBoolean(job.endDate != null);
-            if (job.endDate != null) {
-                out.writeUTF(serializeDate(job.endDate));
-            }
-            out.writeUTF(job.directory);
-            writeFFMPEGFile(out, job.outputPath);
-            out.writeUTF(job.status.name());
-            out.writeInt(job.inputPaths.size());
-            for (FFMPEGFile inputPath : job.inputPaths) {
-                writeFFMPEGFile(out, inputPath);
-            }
-            out.writeBoolean(job.goFast);
+            out.writeUTF(om.writeValueAsString(job));
         }
 
         @Override
         public Job deserialize(DataInput in, int available) throws IOException {
-            int version = in.readInt();
-            String jobID = in.readUTF();
-            String name = in.readUTF();
-            int startTrim = in.readInt();
-            int endTrim = in.readInt();
-            LocalDateTime createDate = parseDate(in.readUTF());
-            LocalDateTime endDate = null;
-            boolean hasEndDate = in.readBoolean();
-            if (hasEndDate) {
-                endDate = parseDate(in.readUTF());
-            }
-            String directory = in.readUTF();
-            FFMPEGFile outputPath = readFFMPEGFile(in);
-            JobStatus status = JobStatus.valueOf(in.readUTF());
-            int numInputs = in.readInt();
-            List<FFMPEGFile> inputPaths = new ArrayList<>();
-            for (int i = 0; i < numInputs; i++) {
-                inputPaths.add(readFFMPEGFile(in));
-            }
-            boolean goFast = in.readBoolean();
-            return new Job(jobID, createDate, endDate, name, directory, outputPath, status, inputPaths,
-                           startTrim != Integer.MIN_VALUE ? startTrim : null,
-                           endTrim != Integer.MIN_VALUE ? endTrim : null, goFast);
-        }
-
-        private String serializeDate(LocalDateTime date) {
-            return date.format(DateTimeFormatter.ISO_DATE_TIME);
-        }
-
-        private LocalDateTime parseDate(String input) {
-            return LocalDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(input));
-        }
-
-        private void writeFFMPEGFile(DataOutput out, FFMPEGFile f) throws IOException {
-            out.writeUTF(f.path);
-            out.writeUTF(f.encodingStatus.name());
-        }
-
-        private FFMPEGFile readFFMPEGFile(DataInput in) throws IOException {
-            String path = in.readUTF();
-            EncodingStatus encodingStatus = EncodingStatus.valueOf(in.readUTF());
-
-            return new FFMPEGFile(path, encodingStatus);
+            return om.readValue(in.readUTF(), Job.class);
         }
 
         @Override

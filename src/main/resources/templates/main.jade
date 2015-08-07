@@ -16,12 +16,12 @@ html
                             th Output File
                             th Progress
                     tbody
-                        each job in jobs
+                        each job, i in jobs
                             tr
                                 td
                                     a(href='jobs/#{job.jobID}') #{job.name}
                                 td #{job.outputPath.path}
-                                td #{job.percentComplete()}% #{job.progress} (#{job.status.name})
+                                td #{completionPercentages[i]}%
 
             h2 Create a new Job
             a(href='/browse') Browse the filesystem

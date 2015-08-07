@@ -4,16 +4,19 @@ import com.dacklabs.mp4splicer.model.EncodingStats;
 import com.dacklabs.mp4splicer.model.Job;
 import com.dacklabs.mp4splicer.model.JobStatus;
 import com.dacklabs.mp4splicer.templateengines.ExternalJadeTemplateEngine;
+import com.dacklabs.mp4splicer.templateengines.ResourcesJadeTemplateEngine;
 import com.dacklabs.mp4splicer.workers.FFMpegConcatWorker;
 import com.dacklabs.mp4splicer.workers.FFMpegFilterGraphWorker;
-import com.dacklabs.mp4splicer.templateengines.ResourcesJadeTemplateEngine;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MultimapBuilder;
-import spark.*;
+import spark.ModelAndView;
+import spark.QueryParamsMap;
+import spark.Spark;
+import spark.TemplateEngine;
 
 import java.io.File;
 import java.io.IOException;
@@ -79,22 +82,27 @@ public class MovieServer {
 
         Spark.get("/", (req, res) -> {
             Map<String, Object> map = new HashMap<>();
-            map.put("jobs", db.jobs());
+            Collection<Job> jobs = db.jobs();
+            List<Double> completionPercentages = jobs.stream().map(j -> {
+                List<EncodingStats> concatStats = db.getConcatStats(j);
+                EncodingStats currentStats = Iterables.getLast(concatStats, EncodingStats.none());
+                return j.percentComplete(currentStats);
+            }).collect(Collectors.toList());
+            map.put("jobs", jobs);
+            map.put("completionPercentages", completionPercentages);
             return new ModelAndView(map, "main");
         }, templateEngine);
 
         Spark.get("/jobs/:jobId", (req, res) -> {
             String jobId = req.params("jobId");
             Job job = db.getJob(jobId);
-            List<EncodingStats> inputStats = new ArrayList<>();
-            for (int i = 0; i < job.inputPaths.size(); i++) {
-                inputStats.add(Iterables.getLast(db.getInputStats(job, i), EncodingStats.none()));
-            }
+            List<EncodingStats> outputStats = db.getConcatStats(job);
+            EncodingStats currentOutputStats = Iterables.getLast(outputStats, EncodingStats.none());
 
             Map<String, Object> map = new HashMap<>();
             map.put("job", job);
-            map.put("inputStats", inputStats);
-            map.put("outputStats", Iterables.getLast(db.getConcatStats(job), EncodingStats.none()));
+            map.put("percentComplete", job.percentComplete(currentOutputStats));
+            map.put("outputStats", currentOutputStats);
             return new ModelAndView(map, "job");
         }, templateEngine);
 
@@ -119,9 +127,8 @@ public class MovieServer {
             if (file.isDirectory() && file.canRead()) {
                 File[] files = file.listFiles();
                 directoryFiles = Arrays.asList(files).stream()
-                        .sorted((f1, f2) -> Boolean.compare(f2.isDirectory(), f1.isDirectory()))
-                        .map(MovieServer::frontendFile)
-                        .collect(Collectors.toList());
+                                       .sorted((f1, f2) -> Boolean.compare(f2.isDirectory(), f1.isDirectory()))
+                                       .map(MovieServer::frontendFile).collect(Collectors.toList());
                 File parent = file.getParentFile();
                 if (parent != null && parent.exists()) {
                     directoryFiles.add(0, frontendFile(parent, ".."));
@@ -138,8 +145,10 @@ public class MovieServer {
         Spark.post("/create-job", (req, res) -> {
             QueryParamsMap jobDetails = req.queryMap();
             String name = Preconditions.checkNotNull(jobDetails.get("name").value(), "job name cannot be null");
-            String outputFile = Preconditions.checkNotNull(jobDetails.get("output").value(), "output file name cannot be null");
-            String directory = Preconditions.checkNotNull(jobDetails.get("directory").value(), "Base directory cannot be null");
+            String outputFile =
+                    Preconditions.checkNotNull(jobDetails.get("output").value(), "output file name cannot be null");
+            String directory =
+                    Preconditions.checkNotNull(jobDetails.get("directory").value(), "Base directory cannot be null");
             boolean goFast = jobDetails.get("fast").value() != null;
             String[] inputFiles = jobDetails.get("inputFiles").values();
             Integer startTrim = getTrim("startTrim", jobDetails);
@@ -147,20 +156,13 @@ public class MovieServer {
 
             Preconditions.checkArgument(inputFiles.length > 1, "Must have at least two inputs");
             String jobId = UUID.randomUUID().toString();
-            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim, goFast);
+            Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim,
+                                 goFast);
             db.saveJob(job);
             executor.execute(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
 
             res.redirect("/");
             return null;
-        });
-
-        Spark.exception(RuntimeException.class, new ExceptionHandler() {
-            @Override
-            public void handle(Exception exception, Request request, Response response) {
-                response.status(500);
-                response.body(exception.getMessage());
-            }
         });
     }
 

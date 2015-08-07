@@ -1,8 +1,8 @@
 package com.dacklabs.mp4splicer.model;
 
-/**
-* Created by david on 7/28/2015.
-*/
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class FFMPEGFile {
     public final String path;
     public final EncodingStatus encodingStatus;
@@ -11,7 +11,9 @@ public class FFMPEGFile {
         return new FFMPEGFile(path, EncodingStatus.WAITING);
     }
 
-    public FFMPEGFile(String path, EncodingStatus encodingStatus) {
+    @JsonCreator
+    public FFMPEGFile(@JsonProperty("path") String path,
+                      @JsonProperty("encodingStatus") EncodingStatus encodingStatus) {
         this.path = path;
         this.encodingStatus = encodingStatus;
     }
