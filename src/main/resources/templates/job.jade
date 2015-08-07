@@ -3,8 +3,9 @@ html
     head
         meta(charset='utf-8')
         title Details for #{job.name}
-        link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+        include css
     body
+        include mixinProgressbar
         include navbar
         div(class='container')
             h1 Job "#{job.name}"
@@ -20,7 +21,8 @@ html
                     tr
                         td #{job.status.name}
                         td #{job.formattedElapsedTime()}
-                        td #{percentComplete}%
+                        td
+                            +progress(percentComplete, job.status)
             table(class='table table-striped')
                 thead
                     tr
@@ -42,8 +44,14 @@ html
                 thead
                     tr
                         th Input File
+                        th Duration
+                        th Bitrate
                 tbody
                 for inputFile,i in job.inputPaths
                     tr
                         td
                             code #{inputFile.path}
+                        td
+                            #{inputFile.stats.metadata["Duration"]}
+                        td
+                            #{inputFile.stats.bitrate} kbits/s

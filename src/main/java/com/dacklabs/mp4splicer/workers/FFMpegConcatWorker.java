@@ -38,6 +38,7 @@ public class FFMpegConcatWorker implements Runnable {
     public void run() {
         try {
             Job job = db.getJob(jobId);
+            System.out.println("Running job " + job.name + " (" + job.jobID + ")");
 
             for (InputFile inputFile : job.inputPaths) {
                 job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
@@ -50,7 +51,7 @@ public class FFMpegConcatWorker implements Runnable {
 
             System.out.println("Executing: " + Joiner.on(" ").join(command));
 
-            job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).concatenating());
+            job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
             Process concatProcess = new ProcessBuilder().redirectError(new File(job.concatErrorsLogFile()))
                                                         .redirectOutput(new File(job.concatOutputLogFile()))
                                                         .command(command).start();
@@ -82,14 +83,10 @@ public class FFMpegConcatWorker implements Runnable {
         command.add("-y");
         command.add("-f");
         command.add("concat");
-        command.add("-fflags");
-        command.add("+genpts");
         command.add("-i");
         command.add(inputFilesConfig.toString());
         command.add("-c");
         command.add("copy");
-        command.add("-t");
-        command.add("20");
         if (job.startTrimTimeSeconds != null) {
             command.add("-ss");
             command.add(job.startTrimTimeSeconds.toString());

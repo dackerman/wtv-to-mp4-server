@@ -36,6 +36,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
     public void run() {
         try {
             Job job = db.getJob(jobId);
+            System.out.println("Running job " + job.name + " (" + job.jobID + ")");
 
             for (InputFile inputFile : job.inputPaths) {
                 job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
@@ -46,7 +47,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
 
             System.out.println("Executing: " + Joiner.on(" ").join(command));
 
-            job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).concatenating());
+            job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
             Process concatProcess = new ProcessBuilder().redirectError(new File(job.concatErrorsLogFile()))
                                                         .redirectOutput(new File(job.concatOutputLogFile()))
                                                         .command(command).start();

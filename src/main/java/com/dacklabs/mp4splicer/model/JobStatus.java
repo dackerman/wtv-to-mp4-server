@@ -4,11 +4,9 @@ package com.dacklabs.mp4splicer.model;
 * Created by david on 7/28/2015.
 */
 public enum JobStatus {
-    CREATED("Created (step 1/5)"),
-    ENCODING("Encoding input files (step 2/5)"),
-    CONCATENATING("Concatenating input files (step 3/5)"),
-    COPYING_OUTPUT("Copying output to destination directory (step 4/5)"),
-    DONE("Completed (step 5/5)"),
+    CREATED("Created (step 1/3)"),
+    ENCODING("Encoding (step 2/3)"),
+    DONE("Completed (step 3/3)"),
     CANCELED("Canceled");
 
     public final String name;

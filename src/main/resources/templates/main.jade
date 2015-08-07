@@ -3,8 +3,9 @@ html
     head
         meta(charset='utf-8')
         title Movie Server
-        link(rel='stylesheet', href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css')
+        include css
     body
+        include mixinProgressbar
         include navbar
         div(class='container')
             if !jobs.length
@@ -13,6 +14,7 @@ html
                     thead
                         tr
                             th Job Name
+                            th Job Status
                             th Output File
                             th Progress
                     tbody
@@ -21,7 +23,9 @@ html
                                 td
                                     a(href='jobs/#{job.jobID}') #{job.name}
                                 td #{job.outputPath.path}
-                                td #{completionPercentages[i]}%
+                                td #{job.status.name}
+                                td
+                                    +progress(completionPercentages[i], job.status)
 
             h2 Create a new Job
             a(href='/browse') Browse the filesystem

@@ -135,14 +135,6 @@ public class Job {
         return updateJob(endDate, outputPath, JobStatus.ENCODING, inputPaths);
     }
 
-    public Job concatenating() {
-        return updateJob(endDate, outputPath, JobStatus.CONCATENATING, inputPaths);
-    }
-
-    public Job copyingOutput() {
-        return updateJob(endDate, outputPath, JobStatus.COPYING_OUTPUT, inputPaths);
-    }
-
     public Job done() {
         return updateJob(LocalDateTime.now(), outputPath, JobStatus.DONE, inputPaths);
     }

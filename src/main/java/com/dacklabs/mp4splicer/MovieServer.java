@@ -23,9 +23,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 public class MovieServer {
@@ -63,8 +61,7 @@ public class MovieServer {
             templateEngine = new ExternalJadeTemplateEngine();
         }
 
-        ThreadPoolExecutor executor =
-                new ThreadPoolExecutor(1, 5, 60, TimeUnit.SECONDS, new LinkedBlockingDeque<>());
+        ExecutorService executorService = Executors.newCachedThreadPool();
 
         ListMultimap<String, Process> runningProcesses = MultimapBuilder.hashKeys().arrayListValues().build();
 
@@ -73,7 +70,7 @@ public class MovieServer {
         for (Job job : db.jobs()) {
             if (!job.status.equals(JobStatus.DONE) && !job.status.equals(JobStatus.CANCELED)) {
                 System.out.println("Restarting incomplete job " + job.jobID);
-                executor.execute(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
+                executorService.submit(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
             }
         }
         Spark.port(port);
@@ -117,7 +114,7 @@ public class MovieServer {
             return "";
         });
 
-        Spark.get("/browse", (req, res) -> {res.redirect("/browse/||CENTERCOURT|videotest"); return null;});
+        Spark.get("/browse", (req, res) -> {res.redirect("/browse/C:||Temp"); return null;});
 
         Spark.get("/browse/:url", (req, res) -> {
             String url = req.params("url");
@@ -159,7 +156,7 @@ public class MovieServer {
             Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim,
                                  goFast);
             db.saveJob(job);
-            executor.execute(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
+            executorService.submit(createWorker(tempDir, ffmpegPath, runningProcesses, db, job));
 
             res.redirect("/");
             return null;
