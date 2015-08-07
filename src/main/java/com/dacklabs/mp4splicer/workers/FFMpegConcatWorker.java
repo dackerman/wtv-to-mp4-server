@@ -25,8 +25,8 @@ public class FFMpegConcatWorker implements Runnable {
     private final ListMultimap<String, Process> runningProcesses;
     private final String ffmpeg;
 
-    public FFMpegConcatWorker(Database db, ListMultimap<String, Process> runningProcesses, String jobId, String tempLocation,
-                       String ffmpeg) {
+    public FFMpegConcatWorker(Database db, ListMultimap<String, Process> runningProcesses, String jobId,
+                              String tempLocation, String ffmpeg) {
         this.db = db;
         this.jobId = jobId;
         this.tempLocation = tempLocation;
@@ -39,6 +39,7 @@ public class FFMpegConcatWorker implements Runnable {
         try {
             Job job = db.getJob(jobId);
             System.out.println("Running job " + job.name + " (" + job.jobID + ")");
+            job = db.saveJob(job.resetTimer());
 
             for (InputFile inputFile : job.inputPaths) {
                 job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));
@@ -67,7 +68,8 @@ public class FFMpegConcatWorker implements Runnable {
         }
     }
 
-    private Path writeFFMpegConfigFile(Job job) throws IOException {List<String> configLines = new ArrayList<>();
+    private Path writeFFMpegConfigFile(Job job) throws IOException {
+        List<String> configLines = new ArrayList<>();
         for (InputFile inputPath : job.inputPaths) {
             configLines.add("file " + inputPath.path.replace("\\", "/").replace(" ", "\\ "));
         }

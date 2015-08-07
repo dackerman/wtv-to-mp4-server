@@ -27,6 +27,8 @@ html
                 thead
                     tr
                         th Output File
+                        th Trim Beginning
+                        th Trim End
                         th Encoding Status
                         th Time Left
                         th Bitrate
@@ -35,6 +37,8 @@ html
                     tr
                         td
                             code #{job.outputPath.path}
+                        td #{job.formatStartTrim()}
+                        td #{job.formatEndTrim()}
                         td #{job.outputPath.encodingStatus}
                         td #{outputStats.estimatedTimeLeft}
                         td #{outputStats.bitrate}
@@ -52,6 +56,6 @@ html
                         td
                             code #{inputFile.path}
                         td
-                            #{inputFile.stats.metadata["Duration"]}
+                            #{inputFile.formattedDuration()}
                         td
                             #{inputFile.stats.bitrate} kbits/s

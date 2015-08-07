@@ -21,16 +21,4 @@ public class FFMPEGFile {
     public FFMPEGFile transitionTo(EncodingStatus newStatus) {
         return new FFMPEGFile(path, newStatus);
     }
-
-    public double percentComplete() {
-        switch (encodingStatus) {
-            case WAITING:
-                return 0;
-            case ENCODING:
-                return 50;
-            case DONE:
-                return 100;
-        }
-        return 0;
-    }
 }

@@ -37,6 +37,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
         try {
             Job job = db.getJob(jobId);
             System.out.println("Running job " + job.name + " (" + job.jobID + ")");
+            job = db.saveJob(job.resetTimer());
 
             for (InputFile inputFile : job.inputPaths) {
                 job = job.updateInput(inputFile.withProbedStats(InputFileStats.probeStats(inputFile.path)));

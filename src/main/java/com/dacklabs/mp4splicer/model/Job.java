@@ -9,6 +9,7 @@ import com.google.common.collect.Lists;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -60,8 +61,24 @@ public class Job {
         this.goFast = goFast;
     }
 
+    public String formatStartTrim() {
+        if (startTrimTimeSeconds != null)
+            return formatDuration(Duration.of(startTrimTimeSeconds, ChronoUnit.SECONDS));
+        return "N/A";
+    }
+
+    public String formatEndTrim() {
+        if (endTrimTimeSeconds != null)
+            return formatDuration(Duration.of(endTrimTimeSeconds, ChronoUnit.SECONDS));
+        return "N/A";
+    }
+
     public String formattedElapsedTime() {
         Duration elapsedTime = Duration.between(createDate, endDate == null ? LocalDateTime.now() : endDate);
+        return formatDuration(elapsedTime);
+    }
+
+    public static String formatDuration(Duration elapsedTime) {
         long days = elapsedTime.toDays();
         elapsedTime = elapsedTime.minusDays(days);
         long hours = elapsedTime.toHours();
@@ -72,22 +89,20 @@ public class Job {
 
         List<String> units = new ArrayList<>();
         if (days > 0) {
-            units.add(days + " days");
+            units.add(days + " day" + (days > 1 ? "s" : ""));
         }
         if (hours > 0) {
-            units.add(hours + " hours");
+            units.add(hours + " hour" + (hours > 1 ? "s" : ""));
         }
         if (minutes > 0) {
-            units.add(minutes + " minutes");
+            units.add(minutes + " minute" + (minutes > 1 ? "s" : ""));
         }
-        if (seconds > 0) {
-            units.add(seconds + " seconds");
-        }
+        units.add(seconds + " second" + (seconds == 1 ? "" : "s"));
         return Joiner.on(", ").join(units);
     }
 
     public double percentComplete(EncodingStats currentOutputStats) {
-        long totalFrames = inputPaths.stream().map(i -> i.stats.totalFrames()).reduce(0L, (a,b) -> a + b);
+        long totalFrames = inputPaths.stream().map(i -> i.stats.totalFrames()).reduce(0L, (a, b) -> a + b);
 
         int frame = currentOutputStats.frame;
         totalFrames = Math.max(totalFrames, 1); // avoid div by zero
@@ -141,6 +156,11 @@ public class Job {
 
     public Job cancel() {
         return updateJob(endDate, outputPath, JobStatus.CANCELED, inputPaths);
+    }
+
+    public Job resetTimer() {
+        return new Job(jobID, LocalDateTime.now(), endDate, name, directory, outputPath, status, inputPaths,
+                       startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }
 
     private Job updateJob(LocalDateTime endDate, FFMPEGFile outputPath, JobStatus status, List<InputFile> inputPaths) {
