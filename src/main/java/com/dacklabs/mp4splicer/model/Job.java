@@ -3,12 +3,13 @@ package com.dacklabs.mp4splicer.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,6 +74,10 @@ public class Job {
         return "N/A";
     }
 
+    public String formattedStartTime() {
+        return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).format(createDate);
+    }
+
     public String formattedElapsedTime() {
         Duration elapsedTime = Duration.between(createDate, endDate == null ? LocalDateTime.now() : endDate);
         return formatDuration(elapsedTime);
@@ -106,30 +111,17 @@ public class Job {
 
         int frame = currentOutputStats.frame;
         totalFrames = Math.max(totalFrames, 1); // avoid div by zero
-        return new BigDecimal(frame).setScale(5, BigDecimal.ROUND_UNNECESSARY)
+        return Math.max(Math.min(new BigDecimal(frame).setScale(5, BigDecimal.ROUND_UNNECESSARY)
                                                       .divide(new BigDecimal(totalFrames), BigDecimal.ROUND_HALF_UP)
-                                                      .movePointRight(2)
-                                                      .doubleValue();
+                                                      .movePointRight(2).doubleValue(), 100.0), 0.0);
     }
 
-    public String concatErrorsLogFile() {
-        return String.format("logs/job-%s-%s-concat-stderr.log", jobID, name);
+    public String jobStatsFile() {
+        return String.format("logs/job-%s-%s-stats.log", jobID, name);
     }
 
-    public String concatOutputLogFile() {
-        return String.format("logs/job-%s-%s-concat-stdout.log", jobID, name);
-    }
-
-    public String inputConversionErrorsLogFile(int index) {
-        InputFile input = inputPaths.get(index);
-        String inputName = Iterables.getLast(Lists.newArrayList(input.path.split("[\\\\/]")));
-        return String.format("logs/job-%s-%s-%s-%s-convert-stderr.log", jobID, name, inputName, index);
-    }
-
-    public String inputConversionOutputLogFile(int index) {
-        InputFile input = inputPaths.get(index);
-        String inputName = Iterables.getLast(Lists.newArrayList(input.path.split("[\\\\/]")));
-        return String.format("logs/job-%s-%s-%s-%s-convert-stdout.log", jobID, name, inputName, index);
+    public String jobStdErrFile() {
+        return String.format("logs/job-%s-%s-stderr.log", jobID, name);
     }
 
     private double rangeBetween(double value, int lowPercent, int highPercent) {

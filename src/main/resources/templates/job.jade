@@ -11,18 +11,24 @@ html
             h1 Job "#{job.name}"
                 if job.status != 'CANCELED'
                     a(href='/jobs/#{job.jobID}/cancel',class='btn btn-danger pull-right') Cancel
+            +progress(percentComplete, job.status)
+
             table(class='table table-striped')
                 thead
                     tr
                         th Status
+                        th Start Time
                         th Elapsed Time
+                        th Logs
                         th % Complete
                 tbody
                     tr
                         td #{job.status.name}
+                        td #{job.formattedStartTime()}
                         td #{job.formattedElapsedTime()}
                         td
-                            +progress(percentComplete, job.status)
+                            a(href="/logs/#{job.jobID}",target="_window") Logs
+                        td #{percentComplete}%
             table(class='table table-striped')
                 thead
                     tr

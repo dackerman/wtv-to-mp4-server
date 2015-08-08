@@ -9,7 +9,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ListMultimap;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,9 +52,9 @@ public class FFMpegConcatWorker implements Runnable {
             System.out.println("Executing: " + Joiner.on(" ").join(command));
 
             job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
-            Process concatProcess = new ProcessBuilder().redirectError(new File(job.concatErrorsLogFile()))
-                                                        .redirectOutput(new File(job.concatOutputLogFile()))
-                                                        .command(command).start();
+            Process concatProcess = new ProcessBuilder().command(command).start();
+            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, db, concatProcess.getErrorStream());
+            logWatcher.start();
             runningProcesses.put(job.jobID, concatProcess);
             int concatReturnValue = concatProcess.waitFor();
             if (concatReturnValue != 0) {
@@ -63,6 +62,7 @@ public class FFMpegConcatWorker implements Runnable {
             }
             db.saveJob(job.updateOutputStatus(EncodingStatus.DONE).done());
             System.out.println("Done.");
+            logWatcher.kill();
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }

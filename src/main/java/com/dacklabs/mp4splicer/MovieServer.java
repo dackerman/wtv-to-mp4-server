@@ -7,6 +7,7 @@ import com.dacklabs.mp4splicer.templateengines.ExternalJadeTemplateEngine;
 import com.dacklabs.mp4splicer.templateengines.ResourcesJadeTemplateEngine;
 import com.dacklabs.mp4splicer.workers.FFMpegConcatWorker;
 import com.dacklabs.mp4splicer.workers.FFMpegFilterGraphWorker;
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -18,12 +19,17 @@ import spark.QueryParamsMap;
 import spark.Spark;
 import spark.TemplateEngine;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class MovieServer {
@@ -61,6 +67,10 @@ public class MovieServer {
             templateEngine = new ExternalJadeTemplateEngine();
         }
 
+        if (!Files.exists(Paths.get("logs/"))) {
+            Files.createDirectory(Paths.get("logs/")); // create logs directory if it doesn't exist
+        }
+
         ExecutorService executorService = Executors.newCachedThreadPool();
 
         ListMultimap<String, Process> runningProcesses = MultimapBuilder.hashKeys().arrayListValues().build();
@@ -81,7 +91,7 @@ public class MovieServer {
             Map<String, Object> map = new HashMap<>();
             Collection<Job> jobs = db.jobs();
             List<Double> completionPercentages = jobs.stream().map(j -> {
-                List<EncodingStats> concatStats = db.getConcatStats(j);
+                List<EncodingStats> concatStats = db.getJobStats(j);
                 EncodingStats currentStats = Iterables.getLast(concatStats, EncodingStats.none());
                 return j.percentComplete(currentStats);
             }).collect(Collectors.toList());
@@ -93,7 +103,7 @@ public class MovieServer {
         Spark.get("/jobs/:jobId", (req, res) -> {
             String jobId = req.params("jobId");
             Job job = db.getJob(jobId);
-            List<EncodingStats> outputStats = db.getConcatStats(job);
+            List<EncodingStats> outputStats = db.getJobStats(job);
             EncodingStats currentOutputStats = Iterables.getLast(outputStats, EncodingStats.none());
 
             Map<String, Object> map = new HashMap<>();
@@ -112,6 +122,24 @@ public class MovieServer {
 
             res.redirect("/jobs/" + jobID);
             return "";
+        });
+
+        Spark.get("/logs/:jobId", (req, res) -> {
+            String jobID = req.params("jobId");
+            Job job = db.getJob(jobID);
+            BufferedReader reader =
+                    Files.newBufferedReader(Paths.get(job.jobStdErrFile()), Charsets.UTF_8);
+            PrintWriter writer = res.raw().getWriter();
+            char[] buf = new char[10000];
+            while (reader.ready()) {
+                int size = reader.read(buf);
+                if (size == -1) break;
+                writer.write(buf, 0, size);
+            }
+            reader.close();
+            res.type("text/plain");
+            writer.flush();
+            return null;
         });
 
         Spark.get("/browse", (req, res) -> {res.redirect("/browse/C:||Temp"); return null;});

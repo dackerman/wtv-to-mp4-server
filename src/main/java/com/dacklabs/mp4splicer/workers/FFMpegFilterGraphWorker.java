@@ -8,7 +8,6 @@ import com.dacklabs.mp4splicer.model.Job;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ListMultimap;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -49,9 +48,9 @@ public class FFMpegFilterGraphWorker implements Runnable {
             System.out.println("Executing: " + Joiner.on(" ").join(command));
 
             job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
-            Process concatProcess = new ProcessBuilder().redirectError(new File(job.concatErrorsLogFile()))
-                                                        .redirectOutput(new File(job.concatOutputLogFile()))
-                                                        .command(command).start();
+            Process concatProcess = new ProcessBuilder().command(command).start();
+            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, db, concatProcess.getErrorStream());
+            logWatcher.start();
             runningProcesses.put(job.jobID, concatProcess);
             int concatReturnValue = concatProcess.waitFor();
             if (concatReturnValue != 0) {
@@ -59,6 +58,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
             }
             db.saveJob(job.updateOutputStatus(EncodingStatus.DONE).done());
             System.out.println("Done.");
+            logWatcher.kill();
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
@@ -68,9 +68,19 @@ public class FFMpegFilterGraphWorker implements Runnable {
         List<String> command = new ArrayList<>();
         command.add(ffmpeg);
         command.add("-y");
-        for (InputFile inputPath : job.inputPaths) {
+
+        if (job.startTrimTimeSeconds != null) {
+            command.add("-ss");
+            command.add(job.startTrimTimeSeconds.toString());
+        }
+        for (int i = 0; i < job.inputPaths.size(); i++) {
+            boolean isLastInput = i == job.inputPaths.size() - 1;
+            if (isLastInput && job.endTrimTimeSeconds != null) {
+                command.add("-sseof");
+                command.add("-" + job.endTrimTimeSeconds);
+            }
             command.add("-i");
-            command.add("\"" + inputPath.path + "\"");
+            command.add("\"" + job.inputPaths.get(i).path + "\"");
         }
         command.add("-filter_complex");
         command.add("\"[0:1] [0:0] [1:1] [1:0] concat=n=2:v=1:a=1 [v] [a]\"");
@@ -81,14 +91,6 @@ public class FFMpegFilterGraphWorker implements Runnable {
         command.add("-b:v");
         command.add("10000k");
 
-        if (job.startTrimTimeSeconds != null) {
-            command.add("-ss");
-            command.add(job.startTrimTimeSeconds.toString());
-        }
-        if (job.endTrimTimeSeconds != null) {
-            command.add("-sseof");
-            command.add("-" + job.endTrimTimeSeconds);
-        }
         Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
         command.add("\"" + outputFullPath + "\"");
         return command;

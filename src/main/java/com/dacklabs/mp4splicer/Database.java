@@ -5,13 +5,13 @@ import com.dacklabs.mp4splicer.model.Job;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
+import com.google.common.base.Charsets;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
 
 import java.io.*;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -19,8 +19,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Database {
 
@@ -48,38 +47,29 @@ public class Database {
         return job;
     }
 
-    public List<EncodingStats> getConcatStats(Job job) {
-        return getStatsFromLog(Paths.get(job.concatErrorsLogFile()));
-    }
-
-    public List<EncodingStats> getInputStats(Job job, int i) {
-        return getStatsFromLog(Paths.get(job.inputConversionErrorsLogFile(i)));
+    public List<EncodingStats> getJobStats(Job job) {
+        return getStatsFromLog(Paths.get(job.jobStatsFile()));
     }
 
     private List<EncodingStats> getStatsFromLog(Path logFile) {
-        List<EncodingStats> stats = new ArrayList<>();
-        Pattern statsPattern = Pattern.compile(
-                ".*frame=\\s*(?<frame>\\d+) fps=\\s*(?<fps>[\\d.]+).*size=\\s*(?<size>\\d+kB) time=(?<time>.*) " +
-                        "bitrate=(?<bitrate>[^ ]*).*");
+        ObjectMapper om = new ObjectMapper();
         try {
-            for (String line : Files.readAllLines(logFile, Charset.forName("UTF-8"))) {
-                Matcher matcher = statsPattern.matcher(line);
-
-                if (!matcher.matches()) continue;
-
-                int frame = Integer.parseInt(matcher.group("frame"));
-                double fps = Double.parseDouble(matcher.group("fps"));
-                String sizeinKb = matcher.group("size");
-                String estimatedTimeLeft = matcher.group("time");
-                String bitrate = matcher.group("bitrate");
-                stats.add(new EncodingStats(frame, fps, sizeinKb, estimatedTimeLeft, bitrate, 0));
-            }
+            return Files.lines(logFile, Charsets.UTF_8)
+                        .map(line -> {
+                            try {
+                                return om.readValue(line, EncodingStats.class);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            return null;
+                        })
+                        .collect(Collectors.toList());
         } catch(NoSuchFileException nsfe){
             // do nothing, this is normal
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return stats;
+        return new ArrayList<>();
     }
 
     private static class JobSerializer implements Serializable, Serializer<Job> {
