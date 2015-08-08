@@ -108,6 +108,9 @@ public class Job {
 
     public double percentComplete(EncodingStats currentOutputStats) {
         long totalFrames = inputPaths.stream().map(i -> i.stats.totalFrames()).reduce(0L, (a, b) -> a + b);
+        int trimAmount = startTrimTimeSeconds != null ? startTrimTimeSeconds : 0;
+        trimAmount += endTrimTimeSeconds != null ? endTrimTimeSeconds : 0;
+        totalFrames -= inputPaths.get(0).stats.videoStreams.get(0).fps.multiply(new BigDecimal(trimAmount)).longValue();
 
         int frame = currentOutputStats.frame;
         totalFrames = Math.max(totalFrames, 1); // avoid div by zero
