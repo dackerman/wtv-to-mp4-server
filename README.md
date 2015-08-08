@@ -48,6 +48,13 @@ the files into `mp4` format for efficient and organized archival.
 * More types of transformations than just wtv -> mpeg with concat
 * Ability to preview or see where you're about to trim videos
 
+## Screenshots
+
+![Home Screen](/screenshots/home.png?raw=true "Home Screen")
+![Creating a Job](/screenshots/creating-a-job.png?raw=true "Creating a Job")
+![View a Running Job](/screenshots/running-job.png?raw=true "View a Running Job")
+![Logs of the ffmpeg process](/screenshots/logs.png?raw=true "Logs of the ffmpeg process")
+
 ## MIT License
     The MIT License (MIT)
 
