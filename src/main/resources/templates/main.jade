@@ -14,6 +14,7 @@ html
                     thead
                         tr
                             th Job Name
+                            th Start Time
                             th Job Status
                             th Output File
                             th Progress
@@ -22,6 +23,7 @@ html
                             tr
                                 td
                                     a(href='jobs/#{job.jobID}') #{job.name}
+                                td #{job.formattedStartTime()}
                                 td #{job.outputPath.path}
                                 td #{job.status.name}
                                 td

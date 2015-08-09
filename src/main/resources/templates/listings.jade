@@ -28,8 +28,7 @@ html
                             else
                                 td #{listing.name}
                                 td
-                                    if listing.isWtv
-                                        button(class='btn btn-default listing-button', data-value=listing.path) Add
+                                    button(class='btn btn-default listing-button', data-value=listing.path) Add
             form(method='POST', action='/create-job')
                 input(type='hidden', name='directory', value=directory)
                 div(class='form-group')

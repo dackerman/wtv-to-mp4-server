@@ -8,7 +8,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -22,25 +21,28 @@ public class InputFileStats {
     public final ImmutableMap<String, String> metadata;
     public final ImmutableList<AudioStream> audioStreams;
     public final ImmutableList<VideoStream> videoStreams;
+    public final Duration duration;
     public final int bitrate;
 
     @JsonCreator
-    public InputFileStats(@JsonProperty("inputNumber") int inputNumber,
-                          @JsonProperty("fileName") String fileName,
+    public InputFileStats(@JsonProperty("inputNumber") int inputNumber, @JsonProperty("fileName") String fileName,
                           @JsonProperty("metadata") ImmutableMap<String, String> metadata,
                           @JsonProperty("audioStreams") ImmutableList<AudioStream> audioStreams,
                           @JsonProperty("videoStreams") ImmutableList<VideoStream> videoStreams,
+                          @JsonProperty("duration") Duration duration,
                           @JsonProperty("bitrate") int bitrate) {
         this.inputNumber = inputNumber;
         this.fileName = fileName;
         this.metadata = metadata;
         this.audioStreams = audioStreams;
         this.videoStreams = videoStreams;
+        this.duration = duration;
         this.bitrate = bitrate;
     }
 
     public static InputFileStats none() {
-        return new InputFileStats(-1, "", ImmutableMap.<String, String>of(), ImmutableList.<AudioStream>of(), ImmutableList.<VideoStream>of(), -1);
+        return new InputFileStats(-1, "", ImmutableMap.<String, String>of(), ImmutableList.<AudioStream>of(), ImmutableList.<VideoStream>of(),
+                                  Duration.ofDays(0), -1);
     }
 
     private static enum ReaderState {
@@ -48,9 +50,8 @@ public class InputFileStats {
     }
 
     public long totalFrames() {
-        long duration = Long.parseLong(metadata.getOrDefault("Duration", "0") + "00");
-        BigDecimal fps = videoStreams.stream().map(s -> s.fps).findFirst().orElse(new BigDecimal(0));
-        return fps.multiply(new BigDecimal(Duration.of(duration, ChronoUnit.NANOS).getSeconds())).longValue();
+        BigDecimal fps = videoStreams.stream().map(s -> s.fps).findFirst().orElse(new BigDecimal(25));
+        return fps.multiply(new BigDecimal(duration.getSeconds())).longValue();
     }
 
     public static InputFileStats probeStats(String ffmpegPath, String inputFile) throws IOException, InterruptedException {
@@ -73,12 +74,13 @@ public class InputFileStats {
         ImmutableList.Builder<AudioStream> audioStreams = ImmutableList.builder();
         ImmutableList.Builder<VideoStream> videoStreams = ImmutableList.builder();
         int bitrate = -1;
+        Duration duration = null;
 
         Pattern inputPattern = Pattern.compile("Input #(?<inputNumber>\\d),.*, from '(?<fileName>.*)'.*");
-        Pattern durationPattern = Pattern.compile(" *Duration: (?<duration>.*), start: [\\d\\.]+, bitrate: (?<bitrate>\\d+) kb/s.*");
-        Pattern audioPattern = Pattern.compile(" *Stream #\\d:(?<streamNumber>\\d)\\[0x\\d+\\]: Audio:" +
+        Pattern durationPattern = Pattern.compile(" *Duration: (?<hours>\\d+):(?<minutes>\\d+):(?<seconds>\\d+)\\.(?<subseconds>\\d+), start: [\\d\\.]+, bitrate: (?<bitrate>\\d+) kb/s.*");
+        Pattern audioPattern = Pattern.compile(" *Stream #\\d:(?<streamNumber>\\d).*: Audio:" +
                                                        " (?<codec>.*), (?<hz>\\d+) Hz, .*, .*, (?<bitrate>\\d+) kb/s");
-        Pattern videoPattern = Pattern.compile(" *Stream #\\d:(?<streamNumber>\\d)\\[0x\\d+\\]: Video: (?<codec>.*),.*," +
+        Pattern videoPattern = Pattern.compile(" *Stream #\\d:(?<streamNumber>\\d).*: Video: (?<codec>.*),.*," +
                                                        " (?<resolution>\\d+x\\d+).*, (?<fps>[\\d\\.]+) fps,.*");
 
         boolean done = false;
@@ -106,6 +108,10 @@ public class InputFileStats {
                 case DURATION:
                     Matcher durationMatch = durationPattern.matcher(line);
                     if (durationMatch.matches()) {
+                        duration = Duration.ofHours(Integer.parseInt(durationMatch.group("hours")))
+                                                    .plusMinutes(Integer.parseInt(durationMatch.group("minutes")))
+                                                    .plusSeconds(Integer.parseInt(durationMatch.group("seconds")))
+                                                    .plusMillis(Integer.parseInt(durationMatch.group("subseconds")) * 100);
                         bitrate = Integer.parseInt(durationMatch.group("bitrate"));
                     }
                     state = ReaderState.STREAMS;
@@ -136,6 +142,6 @@ public class InputFileStats {
             }
         }
         return new InputFileStats(inputNumber, fileName, metadata.build(), audioStreams.build(), videoStreams.build(),
-                                  bitrate);
+                                  duration, bitrate);
     }
 }

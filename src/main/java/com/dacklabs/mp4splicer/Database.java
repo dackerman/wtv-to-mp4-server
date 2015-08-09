@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
@@ -17,7 +18,6 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,9 +35,9 @@ public class Database {
         return jobs.get(jobID);
     }
 
-    public Collection<Job> jobs() {
+    public List<Job> jobs() {
         HTreeMap<String, Job> jobs = db.getHashMap("jobs");
-        return jobs.values();
+        return Lists.newArrayList(jobs.values());
     }
 
     public Job saveJob(Job job) {

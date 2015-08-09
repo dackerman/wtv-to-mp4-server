@@ -1,8 +1,11 @@
 package com.dacklabs.mp4splicer.model;
 
+import com.dacklabs.mp4splicer.ffmpeg.InputFileStats;
+import com.dacklabs.mp4splicer.ffmpeg.VideoStream;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import java.math.BigDecimal;
@@ -13,6 +16,7 @@ import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class Job {
@@ -107,10 +111,7 @@ public class Job {
     }
 
     public double percentComplete(EncodingStats currentOutputStats) {
-        long totalFrames = inputPaths.stream().map(i -> i.stats.totalFrames()).reduce(0L, (a, b) -> a + b);
-        int trimAmount = startTrimTimeSeconds != null ? startTrimTimeSeconds : 0;
-        trimAmount += endTrimTimeSeconds != null ? endTrimTimeSeconds : 0;
-        totalFrames -= inputPaths.get(0).stats.videoStreams.get(0).fps.multiply(new BigDecimal(trimAmount)).longValue();
+        long totalFrames = calculateTotalFrames();
 
         int frame = currentOutputStats.frame;
         totalFrames = Math.max(totalFrames, 1); // avoid div by zero
@@ -119,17 +120,30 @@ public class Job {
                                                       .movePointRight(2).doubleValue(), 100.0), 0.0);
     }
 
+    private long calculateTotalFrames() {
+        long totalFrames = 0;
+        for (int i = 0; i < inputPaths.size(); i++) {
+            InputFile file = inputPaths.get(i);
+            InputFileStats stats = file.stats;
+            ImmutableList<VideoStream> videoStreams = stats.videoStreams;
+            if (i == inputPaths.size() - 1 && !videoStreams.isEmpty()) {
+                totalFrames += endTrimTimeSeconds != null ? endTrimTimeSeconds * videoStreams.get(0).fps.multiply(new BigDecimal(endTrimTimeSeconds)).longValue() : stats.totalFrames();
+            } else {
+                totalFrames += stats.totalFrames();
+            }
+            if (i == 0 && videoStreams.size() > 0 && startTrimTimeSeconds != null) {
+                totalFrames -= videoStreams.get(0).fps.multiply(new BigDecimal(startTrimTimeSeconds)).longValue();
+            }
+        }
+        return totalFrames;
+    }
+
     public String jobStatsFile() {
         return String.format("logs/job-%s-%s-stats.log", jobID, name);
     }
 
     public String jobStdErrFile() {
         return String.format("logs/job-%s-%s-stderr.log", jobID, name);
-    }
-
-    private double rangeBetween(double value, int lowPercent, int highPercent) {
-        int diff = highPercent - lowPercent;
-        return value * (diff / 100.0) + lowPercent;
     }
 
     public Job updateInput(InputFile newInput) {
@@ -162,4 +176,24 @@ public class Job {
         return new Job(jobID, createDate, endDate, name, directory, outputPath, status, inputPaths,
                        startTrimTimeSeconds, endTrimTimeSeconds, goFast);
     }
+
+    private static int statusSort(Job job) {
+        int sort = 0;
+        if (job.status.equals(JobStatus.CANCELED)) {
+            sort -= 20;
+        }
+        if (job.status.equals(JobStatus.DONE)) {
+            sort -= 10;
+        }
+        return sort;
+    }
+
+    public static Comparator<Job> COMPARATOR = (job1, job2) -> {
+        int diff = statusSort(job2) - statusSort(job1);
+        if (diff != 0) {
+            return diff;
+        } else {
+            return job2.createDate.compareTo(job1.createDate);
+        }
+    };
 }

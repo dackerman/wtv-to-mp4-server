@@ -76,18 +76,32 @@ public class FFMpegFilterGraphWorker implements Runnable {
         for (int i = 0; i < job.inputPaths.size(); i++) {
             boolean isLastInput = i == job.inputPaths.size() - 1;
             if (isLastInput && job.endTrimTimeSeconds != null) {
-                command.add("-sseof");
-                command.add("-" + job.endTrimTimeSeconds);
+                command.add("-t");
+                command.add(job.endTrimTimeSeconds + "");
             }
             command.add("-i");
             command.add("\"" + job.inputPaths.get(i).path + "\"");
         }
         command.add("-filter_complex");
-        command.add("\"[0:1] [0:0] [1:1] [1:0] concat=n=2:v=1:a=1 [v] [a]\"");
+        StringBuilder filterGraph = new StringBuilder("\"");
+        for (int i=0; i < job.inputPaths.size(); i++) {
+            InputFile inputFile = job.inputPaths.get(i);
+            filterGraph.append("[").append(i).append(":");
+            filterGraph.append(inputFile.stats.videoStreams.get(0).streamNumber);
+            filterGraph.append("] ");
+            filterGraph.append("[").append(i).append(":");
+            filterGraph.append(inputFile.stats.audioStreams.get(0).streamNumber);
+            filterGraph.append("] ");
+        }
+        filterGraph.append("concat=n=").append(job.inputPaths.size());
+        filterGraph.append(":v=1:a=1 [v] [a]\"");
+        command.add(filterGraph.toString());
         command.add("-map");
         command.add("\"[v]\"");
         command.add("-map");
         command.add("\"[a]\"");
+        command.add("-c:v");
+        command.add("libx264");
         command.add("-b:v");
         command.add("10000k");
 

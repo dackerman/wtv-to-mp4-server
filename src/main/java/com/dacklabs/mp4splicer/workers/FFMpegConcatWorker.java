@@ -94,8 +94,8 @@ public class FFMpegConcatWorker implements Runnable {
             command.add(job.startTrimTimeSeconds.toString());
         }
         if (job.endTrimTimeSeconds != null) {
-            command.add("-sseof");
-            command.add("-" + job.endTrimTimeSeconds);
+            command.add("-t");
+            command.add(job.endTrimTimeSeconds + "");
         }
         Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
         command.add("\"" + outputFullPath + "\"");

@@ -89,7 +89,8 @@ public class MovieServer {
 
         Spark.get("/", (req, res) -> {
             Map<String, Object> map = new HashMap<>();
-            Collection<Job> jobs = db.jobs();
+            List<Job> jobs = db.jobs();
+            Collections.sort(jobs, Job.COMPARATOR);
             List<Double> completionPercentages = jobs.stream().map(j -> {
                 List<EncodingStats> concatStats = db.getJobStats(j);
                 EncodingStats currentStats = Iterables.getLast(concatStats, EncodingStats.none());

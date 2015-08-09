@@ -4,9 +4,6 @@ import com.dacklabs.mp4splicer.ffmpeg.InputFileStats;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-
 public class InputFile {
     public final String path;
     public final InputFileStats stats;
@@ -19,8 +16,7 @@ public class InputFile {
     }
 
     public String formattedDuration() {
-        Long nanos = Long.valueOf(stats.metadata.getOrDefault("Duration", "0") + "00");
-        return Job.formatDuration(Duration.of(nanos, ChronoUnit.NANOS));
+        return Job.formatDuration(stats.duration);
     }
 
     public InputFile withProbedStats(InputFileStats stats) {
