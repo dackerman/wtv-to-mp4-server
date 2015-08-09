@@ -125,6 +125,18 @@ public class MovieServer {
             return "";
         });
 
+        Spark.get("/jobs/:jobId/delete", (req, res) -> {
+            String jobID = req.params("jobId");
+            Job job = db.saveJob(db.getJob(jobID));
+            for (Process process : runningProcesses.get(job.jobID)) {
+                process.destroyForcibly();
+            }
+            db.deleteJob(job.jobID);
+
+            res.redirect("/");
+            return "";
+        });
+
         Spark.get("/logs/:jobId", (req, res) -> {
             String jobID = req.params("jobId");
             Job job = db.getJob(jobID);
@@ -143,7 +155,7 @@ public class MovieServer {
             return null;
         });
 
-        Spark.get("/browse", (req, res) -> {res.redirect("/browse/C:||Temp"); return null;});
+        Spark.get("/browse", (req, res) -> {res.redirect("/browse/C:"); return null;});
 
         Spark.get("/browse/:url", (req, res) -> {
             String url = req.params("url");

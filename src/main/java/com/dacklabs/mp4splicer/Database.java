@@ -47,6 +47,11 @@ public class Database {
         return job;
     }
 
+    public void deleteJob(String jobID) {
+        db.getHashMap("jobs").remove(jobID);
+        db.commit();
+    }
+
     public List<EncodingStats> getJobStats(Job job) {
         return getStatsFromLog(Paths.get(job.jobStatsFile()));
     }
@@ -54,17 +59,15 @@ public class Database {
     private List<EncodingStats> getStatsFromLog(Path logFile) {
         ObjectMapper om = new ObjectMapper();
         try {
-            return Files.lines(logFile, Charsets.UTF_8)
-                        .map(line -> {
-                            try {
-                                return om.readValue(line, EncodingStats.class);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            return null;
-                        })
-                        .collect(Collectors.toList());
-        } catch(NoSuchFileException nsfe){
+            return Files.lines(logFile, Charsets.UTF_8).map(line -> {
+                try {
+                    return om.readValue(line, EncodingStats.class);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }).collect(Collectors.toList());
+        } catch (NoSuchFileException nsfe) {
             // do nothing, this is normal
         } catch (IOException e) {
             e.printStackTrace();

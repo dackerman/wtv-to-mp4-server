@@ -104,7 +104,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
         command.add("libx264");
         command.add("-b:v");
         int maxBitrate = job.inputPaths.stream().map(i -> i.stats.bitrate).max(Integer::compare).orElse(10000);
-        command.add(maxBitrate + "k");
+        command.add(Math.min(maxBitrate, 15000) + "k");
 
         Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
         command.add("\"" + outputFullPath + "\"");

@@ -18,6 +18,7 @@ html
                             th Job Status
                             th Output File
                             th Progress
+                            th
                     tbody
                         each job, i in jobs
                             tr
@@ -28,6 +29,9 @@ html
                                 td #{job.status.name}
                                 td
                                     +progress(completionPercentages[i], job.status)
+                                td
+                                    a(href="jobs/#{job.jobID}/delete", style="color:#df3339", title="Delete job")
+                                        i(class='fa fa-lg fa-trash-o')
 
             h2 Create a new Job
             a(href='/browse') Browse the filesystem
