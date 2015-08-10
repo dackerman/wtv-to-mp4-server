@@ -192,7 +192,6 @@ public class MovieServer {
             Integer startTrim = getTrim("startTrim", jobDetails);
             Integer endTrim = getTrim("endTrim", jobDetails);
 
-            Preconditions.checkArgument(inputFiles.length > 1, "Must have at least two inputs");
             String jobId = UUID.randomUUID().toString();
             Job job = Job.create(jobId, name, directory, outputFile, Arrays.asList(inputFiles), startTrim, endTrim,
                                  goFast);

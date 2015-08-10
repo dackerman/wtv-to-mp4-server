@@ -82,6 +82,16 @@ public class FFMpegFilterGraphWorker implements Runnable {
             command.add("-i");
             command.add("\"" + job.inputPaths.get(i).path + "\"");
         }
+        if (job.inputPaths.size() > 1) {
+            addFilterGraphConcat(job, command);
+        }
+
+        Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
+        command.add("\"" + outputFullPath + "\"");
+        return command;
+    }
+
+    private void addFilterGraphConcat(Job job, List<String> command) {
         command.add("-filter_complex");
         StringBuilder filterGraph = new StringBuilder("\"");
         for (int i=0; i < job.inputPaths.size(); i++) {
@@ -105,9 +115,5 @@ public class FFMpegFilterGraphWorker implements Runnable {
         command.add("-b:v");
         int maxBitrate = job.inputPaths.stream().map(i -> i.stats.bitrate).max(Integer::compare).orElse(10000);
         command.add(Math.min(maxBitrate, 15000) + "k");
-
-        Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
-        command.add("\"" + outputFullPath + "\"");
-        return command;
     }
 }

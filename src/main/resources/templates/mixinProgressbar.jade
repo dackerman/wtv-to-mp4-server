@@ -1,9 +1,10 @@
-mixin progress(percent, status)
-   div(class="progress")
-      - var progressClass = status == 'CANCELED' ? 'progress-bar-danger' : 'progress-bar-success active';
-      div(class="progress-bar progress-bar-success active progress-bar-striped", role="progressbar",
-          aria-valuenow="#{percent}",aria-valuemin="0",aria-valuemax="100",style="width:#{percent}%")
-         if percent > 30
-            span #{percent}%
-      if percent < 30
-         span(style="font-size:12px;line-height:20px;float:right;margin-right:4px;color:#aaa") #{percent}%
+mixin progress(percent)
+  div(class="progress")
+    - progressClass = 'progress-bar-striped progress-bar-success active';
+    - if (job.status == 'CANCELED') progressClass = 'progress-bar-danger';
+    - if (job.status == 'DONE') progressClass = 'progress-bar-success';
+    div(class="progress-bar #{progressClass}", role="progressbar", aria-valuenow="#{percent}",aria-valuemin="0",aria-valuemax="100",style="width:#{percent}%")
+      if percent > 30
+        span #{percent}%
+    if percent < 30
+      span(style="font-size:12px;line-height:20px;float:right;margin-right:4px;color:#aaa") #{percent}%

@@ -9,9 +9,9 @@ html
         include navbar
         div(class='container')
             h1 Job "#{job.name}"
-                if job.status != 'CANCELED'
+                if job.status != 'CANCELED' && job.status != 'DONE'
                     a(href='/jobs/#{job.jobID}/cancel',class='btn btn-danger pull-right') Cancel
-            +progress(percentComplete, job.status)
+            +progress(percentComplete, job)
 
             table(class='table table-striped')
                 thead
@@ -23,7 +23,15 @@ html
                         th % Complete
                 tbody
                     tr
-                        td #{job.status.name}
+                        td
+                            if job.status == 'DONE'
+                                span(class="label label-success") #{job.status.name} &nbsp;
+                                    i(class="fa fa-check")
+                            else if job.status == 'CANCELED'
+                                span(class="label label-danger") #{job.status.name} &nbsp;
+                                    i(class="fa fa-times")
+                            else
+                                #{job.status.name}
                         td #{job.formattedStartTime()}
                         td #{job.formattedElapsedTime()}
                         td

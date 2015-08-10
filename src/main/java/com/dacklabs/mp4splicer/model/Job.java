@@ -111,6 +111,9 @@ public class Job {
     }
 
     public double percentComplete(EncodingStats currentOutputStats) {
+        if (status.equals(JobStatus.DONE)) {
+            return 100.0;
+        }
         long totalFrames = calculateTotalFrames();
 
         int frame = currentOutputStats.frame;
@@ -127,7 +130,7 @@ public class Job {
             InputFileStats stats = file.stats;
             ImmutableList<VideoStream> videoStreams = stats.videoStreams;
             if (i == inputPaths.size() - 1 && !videoStreams.isEmpty()) {
-                totalFrames += endTrimTimeSeconds != null ? endTrimTimeSeconds * videoStreams.get(0).fps.multiply(new BigDecimal(endTrimTimeSeconds)).longValue() : stats.totalFrames();
+                totalFrames += endTrimTimeSeconds != null ? videoStreams.get(0).fps.multiply(new BigDecimal(endTrimTimeSeconds)).longValue() : stats.totalFrames();
             } else {
                 totalFrames += stats.totalFrames();
             }

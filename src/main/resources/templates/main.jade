@@ -28,7 +28,14 @@ html
                                 td #{job.outputPath.path}
                                 td #{job.status.name}
                                 td
-                                    +progress(completionPercentages[i], job.status)
+                                    if job.status == 'DONE'
+                                        span(class="label label-success") #{job.status.name} &nbsp;
+                                            i(class="fa fa-check")
+                                    else if job.status == 'CANCELED'
+                                        span(class="label label-danger") #{job.status.name} &nbsp;
+                                            i(class="fa fa-times")
+                                    else
+                                        +progress(completionPercentages[i], job.status)
                                 td
                                     a(href="jobs/#{job.jobID}/delete", style="color:#df3339", title="Delete job")
                                         i(class='fa fa-lg fa-trash-o')
