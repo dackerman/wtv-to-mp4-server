@@ -134,7 +134,7 @@ public class Job {
             } else {
                 totalFrames += stats.totalFrames();
             }
-            if (i == 0 && videoStreams.size() > 0 && startTrimTimeSeconds != null) {
+            if (i == 0 && videoStreams.size() > 1 && startTrimTimeSeconds != null) {
                 totalFrames -= videoStreams.get(0).fps.multiply(new BigDecimal(startTrimTimeSeconds)).longValue();
             }
         }

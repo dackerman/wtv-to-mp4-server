@@ -53,7 +53,7 @@ public class FFMpegConcatWorker implements Runnable {
 
             job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
             Process concatProcess = new ProcessBuilder().command(command).start();
-            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, db, concatProcess.getErrorStream());
+            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, concatProcess.getErrorStream());
             logWatcher.start();
             runningProcesses.put(job.jobID, concatProcess);
             int concatReturnValue = concatProcess.waitFor();

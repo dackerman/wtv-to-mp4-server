@@ -1,6 +1,5 @@
 package com.dacklabs.mp4splicer.workers;
 
-import com.dacklabs.mp4splicer.Database;
 import com.dacklabs.mp4splicer.model.EncodingStats;
 import com.dacklabs.mp4splicer.model.Job;
 import com.dacklabs.mp4splicer.model.StatsMatcher;
@@ -14,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -21,14 +22,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FFMpegLogWatcher extends Thread {
 
     private final Job job;
-    private final Database db;
     private final InputStream errorStream;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private static final ObjectMapper om = new ObjectMapper();
+    private LocalDateTime lastFlushTime = LocalDateTime.now();
 
-    public FFMpegLogWatcher(Job job, Database db, InputStream errorStream) {
+    public FFMpegLogWatcher(Job job, InputStream errorStream) {
         this.job = job;
-        this.db = db;
         this.errorStream = errorStream;
     }
 
@@ -51,6 +51,10 @@ public class FFMpegLogWatcher extends Thread {
                     stats.newLine();
                 }
                 stats.flush();
+                if (Duration.between(lastFlushTime, LocalDateTime.now()).minusSeconds(1).isNegative()) {
+                    stdErr.flush();
+                    lastFlushTime = LocalDateTime.now();
+                }
             }
             scanner.close();
             stats.close();

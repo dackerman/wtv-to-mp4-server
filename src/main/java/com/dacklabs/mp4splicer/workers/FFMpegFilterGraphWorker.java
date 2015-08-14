@@ -49,7 +49,7 @@ public class FFMpegFilterGraphWorker implements Runnable {
 
             job = db.saveJob(job.updateOutputStatus(EncodingStatus.ENCODING).encoding());
             Process concatProcess = new ProcessBuilder().command(command).start();
-            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, db, concatProcess.getErrorStream());
+            FFMpegLogWatcher logWatcher = new FFMpegLogWatcher(job, concatProcess.getErrorStream());
             logWatcher.start();
             runningProcesses.put(job.jobID, concatProcess);
             int concatReturnValue = concatProcess.waitFor();
@@ -85,6 +85,9 @@ public class FFMpegFilterGraphWorker implements Runnable {
         if (job.inputPaths.size() > 1) {
             addFilterGraphConcat(job, command);
         }
+        command.add("-b:v");
+        int maxBitrate = job.inputPaths.stream().map(i -> i.stats.bitrate).max(Double::compare).orElse(10000);
+        command.add(Math.min(maxBitrate, 15000) + "k");
 
         Path outputFullPath = Paths.get(job.directory, job.outputPath.path);
         command.add("\"" + outputFullPath + "\"");
@@ -112,8 +115,5 @@ public class FFMpegFilterGraphWorker implements Runnable {
         command.add("\"[a]\"");
         command.add("-c:v");
         command.add("libx264");
-        command.add("-b:v");
-        int maxBitrate = job.inputPaths.stream().map(i -> i.stats.bitrate).max(Integer::compare).orElse(10000);
-        command.add(Math.min(maxBitrate, 15000) + "k");
     }
 }
